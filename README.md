@@ -1,200 +1,173 @@
+<p align="center">
+  <img src="./assets/banner.svg" width="100%" alt="Rosetta MCP Server" />
+</p>
+
 # Rosetta MCP Server
 
-A Model Context Protocol (MCP) server that provides comprehensive access to Rosetta/PyRosetta functions, properties, and capabilities.
+Author: Ariel J. Ben-Sasson
 
-## Features
+A Model Context Protocol (MCP) server that lets Cursor (or any MCP client) work with Rosetta and PyRosetta: run RosettaScripts, validate XML protocols, list common movers/filters/selectors, and optionally score/query via PyRosetta.
 
-- **Complete Rosetta Function Database**: Access to all score functions, movers, filters, residue selectors, and task operations
-- **XML Protocol Validation**: Validate your Rosetta XML protocol files
-- **Interactive Help System**: Get detailed help on any Rosetta topic
-- **Path Detection**: Automatically finds your Rosetta installation
-- **PyRosetta Integration**: Detects if PyRosetta is available and provides enhanced functionality
-- **Global Installation**: Available system-wide on your computer
+## What you get
+- Run RosettaScripts from Cursor (`run_rosetta_scripts`)
+- Generate the RosettaScripts XML schema (`rosetta_scripts_schema`)
+- Validate XML (`validate_xml`)
+- Browse common movers/filters/selectors and parameters (`list_functions`, `get_rosetta_info`, `get_rosetta_help`)
+- Optional PyRosetta tools (`pyrosetta_score`, `pyrosetta_introspect`)
+- Environment helpers (`python_env_info`, `check_pyrosetta`, `install_pyrosetta_installer`, `find_rosetta_scripts`, `search_pyrosetta_wheels`)
 
-## Installation
+## Quick start (non‑experts)
 
-### Prerequisites
-
-- Python 3.7+
-- Node.js 14+
-- Rosetta installation (optional but recommended)
-- PyRosetta (optional but recommended)
-
-### Global Installation
-
-1. **Clone or download this repository:**
-   ```bash
-   cd ~/rosetta_mcp_server
-   ```
-
-2. **Install globally:**
-   ```bash
-   npm install -g .
-   ```
-
-3. **Verify installation:**
-   ```bash
-   rosetta-mcp-server --help
-   ```
-
-### Manual Installation
-
-1. **Make the Python script executable:**
-   ```bash
-   chmod +x rosetta_mcp_server.py
-   ```
-
-2. **Test the Python server:**
-   ```bash
-   python3 rosetta_mcp_server.py info
-   ```
-
-## Usage
-
-### Command Line Interface
-
+1) Install prerequisites (macOS examples)
 ```bash
-# Get comprehensive Rosetta information
-rosetta-mcp-server info
-
-# Get help on specific topics
-rosetta-mcp-server help score_functions
-rosetta-mcp-server help movers
-rosetta-mcp-server help filters
-
-# Validate XML protocol files
-rosetta-mcp-server validate path/to/protocol.xml
+brew install node
+python3 --version
 ```
 
-### MCP Integration
+2) Install this server globally
+```bash
+cd ~/dev/public_repos/rosetta-mcp-server
+npm install -g .
+```
 
-Add to your `~/.cursor/mcp.json`:
-
+3) Register the server in Cursor
+Edit `~/.cursor/mcp.json` and add/update the `rosetta` entry:
 ```json
 {
   "mcpServers": {
     "rosetta": {
-      "command": "rosetta-mcp-server",
-      "args": []
+      "command": "/opt/homebrew/bin/rosetta-mcp-server",
+      "args": [],
+      "env": {
+        "ROSETTA_BIN": "/absolute/path/to/rosetta/main/source/bin",
+        "PYTHON_BIN": "/Users/<you>/.venvs/rosetta-mcp/bin/python"
+      }
     }
   }
 }
 ```
+Notes:
+- Set ROSETTA_BIN to either the directory containing RosettaScripts executables or the full path to the executable (e.g., `.../rosetta_scripts.default.macosclangrelease` or `.../rosetta_scripts_jd3.default.macosclangrelease`).
+- PYTHON_BIN is optional; if set, the server will use that interpreter (recommended when using PyRosetta).
 
-## Available Tools
+4) Restart Cursor
+Open Settings → MCP. The “rosetta” server should be green and its tools visible.
 
-### 1. get_rosetta_info
-Get comprehensive information about your Rosetta setup:
-- Rosetta installation path
-- PyRosetta availability
-- Available score functions
-- Common movers and filters
-- Residue selectors and task operations
-- Command line parameters
+## Setting up the Python environment
 
-### 2. get_rosetta_help
-Get detailed help on specific topics:
-- `score_functions`: Score function explanations
-- `movers`: Mover descriptions and usage
-- `filters`: Filter explanations and parameters
-- `xml`: XML protocol structure
-- `parameters`: Command line parameter details
-
-### 3. validate_xml
-Validate your Rosetta XML protocol files:
-- Syntax validation
-- Structure checking
-- Error reporting
-
-### 4. list_functions
-Get categorized lists of available functions:
-- Score functions
-- Movers
-- Filters
-- Residue selectors
-- Task operations
-- Parameters
-
-## Configuration
-
-The server automatically detects:
-- Rosetta installation paths
-- PyRosetta availability
-- Available XML protocols
-- System-specific configurations
-
-## Examples
-
-### Get All Available Rosetta Functions
+Option A (uv virtualenv; recommended):
 ```bash
-rosetta-mcp-server info | jq '.common_movers'
+uv venv ~/.venvs/rosetta-mcp
+~/.venvs/rosetta-mcp/bin/python -m pip install --upgrade pip
 ```
 
-### Validate Your Protocol
+Install PyRosetta without conda using the official installer:
 ```bash
-rosetta-mcp-server validate inputs/xml/your_protocol.xml
+~/.venvs/rosetta-mcp/bin/python -m pip install pyrosetta-installer
+~/.venvs/rosetta-mcp/bin/python -c "import pyrosetta_installer as I; I.install_pyrosetta()"
 ```
 
-### Get Help on Score Functions
+Verify:
 ```bash
-rosetta-mcp-server help score_functions
+~/.venvs/rosetta-mcp/bin/python -c "import pyrosetta; pyrosetta.init('-mute all'); print('PyRosetta OK')"
+```
+
+Option B (Conda):
+```bash
+conda create -n rosetta-mcp python=3.9 -y
+conda activate rosetta-mcp
+conda install -c rosettacommons pyrosetta -y
+# Then set PYTHON_BIN in ~/.cursor/mcp.json to this env’s python
+```
+
+## Using the tools
+- `run_rosetta_scripts`: run RosettaScripts
+  - Inputs: `xml_path`, `input_pdb`, `out_dir` (required)
+  - Optional: `exe_path` (override), `extra_flags` (array of CLI flags)
+  - Executable resolution order: `exe_path` → `ROSETTA_BIN` (file or directory) → common directories → `rosetta_scripts` on PATH
+- `rosetta_scripts_schema`: write XSD schema to a cache dir, optional element list
+- `validate_xml`: basic syntax validation of an XML string/file
+- `get_rosetta_info`, `list_functions`, `get_rosetta_help`: curated info
+- `pyrosetta_score` (optional): score a PDB using PyRosetta
+- `pyrosetta_introspect` (optional): search PyRosetta classes; return docs/signatures
+- Helpers for setup: `python_env_info`, `check_pyrosetta`, `install_pyrosetta_installer`, `find_rosetta_scripts`, `search_pyrosetta_wheels`
+
+## Examples per tool (human‑readable Q&A)
+
+- get_rosetta_info
+  - Question: “What Rosetta info does my setup have?”
+  - Answer: Returns `rosetta_path`, `pyrosetta_available`, and curated lists (score functions, movers, filters, selectors, task operations, parameters, command‑line options).
+
+- list_functions
+  - Question: “Show me common movers/filters/selectors and task operations.”
+  - Answer: Returns categorized arrays you can copy into XML (names only).
+
+- get_rosetta_help
+  - Question: “Explain ‘filters’ (or ‘movers’, ‘xml’, ‘parameters’, ‘score_functions’).”
+  - Answer: Short textual explanation of the topic.
+
+- validate_xml
+  - Question: “Is this RosettaScripts XML syntactically valid?”
+  - Provide: Your XML string
+  - Answer: `{ valid: true }` or `{ valid: false, error: "..." }` with the failing line/column.
+
+- run_rosetta_scripts
+  - Question: “Run this protocol on this PDB.”
+  - Provide: `xml_path`, `input_pdb`, `out_dir` (and optional flags, e.g., `-nstruct 1`).
+  - Answer: `{ exit_code, stdout, stderr, out_dir }`. Results (PDBs, scores) are written under `out_dir` by Rosetta.
+
+- rosetta_scripts_schema
+  - Question: “Generate the XML schema and list element names.”
+  - Provide: optional `extract_elements: true`.
+  - Answer: `{ schema_path, size, elements? }` where `elements` is a deduplicated list of tag names.
+
+- cache_cli_docs
+  - Question: “Cache RosettaScripts command‑line help for offline search.”
+  - Answer: `{ saved: [help.txt, parser_info.txt] }` paths under a cache directory.
+
+- get_cached_docs
+  - Question: “Search the cached docs for ‘parser’ (or any string).”
+  - Provide: `query: "parser"` (and optional `max_lines`).
+  - Answer: `{ count, matches: [{ file, line, text }, ...] }`.
+
+- pyrosetta_score (requires PyRosetta)
+  - Question: “Score this PDB with the default scorefunction.”
+  - Provide: `pdb_path`.
+  - Answer: `{ score: <number> }`, or `{ error: 'PyRosetta not available: ...' }` if not installed.
+
+- pyrosetta_introspect (requires PyRosetta)
+  - Question: “Find ‘FastRelax’ mover (or any mover/filter/selector/task).”
+  - Provide: `query: "FastRelax"`, optional `kind: "mover|filter|selector|task"`.
+  - Answer: `{ results: [{ name, module, bases, doc, init }, ...], count }`.
+
+## Verify from the command line (optional)
+```bash
+which rosetta-mcp-server
+printf '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"check","version":"1"}}}\n' | rosetta-mcp-server
+printf '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"check","version":"1"}}}\n{"jsonrpc":"2.0","id":2,"method":"tools/list","params":{}}\n' | rosetta-mcp-server
 ```
 
 ## Troubleshooting
-
-### Common Issues
-
-1. **Python not found**: Ensure `python3` is in your PATH
-2. **Permission denied**: Use `sudo npm install -g .` for global installation
-3. **Rosetta path not found**: The server will work with default values
-
-### Testing
-
-```bash
-# Test Python server
-python3 rosetta_mcp_server.py info
-
-# Test Node.js wrapper
-node rosetta_mcp_wrapper.js
-
-# Test global installation
-rosetta-mcp-server info
-```
+- Rosetta server shows red in Cursor
+  - Restart Cursor after editing `~/.cursor/mcp.json`.
+  - Use an absolute command in config (e.g., `/opt/homebrew/bin/rosetta-mcp-server`).
+  - Ensure Node 16+ and Python 3.8+.
+  - Check `ROSETTA_BIN` points to a valid directory or executable, or remove it and rely on PATH.
+- `run_rosetta_scripts` fails to start
+  - Confirm binary is executable (try `"$ROSETTA_BIN" -help`) or pass `exe_path` explicitly.
+- PyRosetta tools say “not available”
+  - Install PyRosetta using `pyrosetta-installer` (pip) or conda.
 
 ## Development
-
-### Project Structure
 ```
-rosetta_mcp_server/
-├── rosetta_mcp_server.py    # Python server with Rosetta knowledge
-├── rosetta_mcp_wrapper.js   # Node.js MCP wrapper
-├── package.json             # NPM package configuration
-└── README.md               # This file
+rosetta-mcp-server/
+├── rosetta_mcp_server.py    # Python server (info/help/xml)
+├── rosetta_mcp_wrapper.js   # Node MCP server (stdio protocol + tools)
+├── package.json             # NPM package (global binary)
+└── README.md                # This file
 ```
 
-### Adding New Functions
+## License and attribution
+- MIT for this repository
+- Rosetta/PyRosetta: see RosettaCommons licenses; commercial use requires the appropriate license
 
-1. **Add to Python server** (`rosetta_mcp_server.py`)
-2. **Add to Node.js wrapper** (`rosetta_mcp_wrapper.js`)
-3. **Update MCP tools list**
-4. **Test and document**
-
-## License
-
-MIT License - see LICENSE file for details.
-
-## Support
-
-For issues or questions:
-1. Check the troubleshooting section
-2. Test individual components
-3. Verify your Rosetta installation
-4. Check MCP configuration in Cursor
-
-## Contributing
-
-Contributions welcome! Please:
-1. Test your changes thoroughly
-2. Update documentation
-3. Follow existing code style
-4. Add appropriate error handling

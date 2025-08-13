@@ -6,22 +6,149 @@
 
 const { spawn } = require('child_process');
 const path = require('path');
+const readline = require('readline');
 
 class RosettaMCPServer {
     constructor() {
-        this.pythonPath = 'python3';
+        this.pythonPath = process.env.PYTHON_BIN || 'python3';
         this.serverPath = path.join(__dirname, 'rosetta_mcp_server.py');
     }
 
+    async pythonEnvInfo() {
+        return new Promise((resolve) => {
+            const py = this.pythonPath;
+            const { spawn } = require('child_process');
+            const script = `
+import json, sys, subprocess
+info = {
+  'python_executable': sys.executable,
+  'python_version': sys.version,
+}
+try:
+    out = subprocess.check_output([sys.executable, '-m', 'pip', 'list', '--format', 'json'], stderr=subprocess.STDOUT, text=True)
+    info['pip_list'] = json.loads(out)
+except Exception as e:
+    info['pip_error'] = str(e)
+print(json.dumps(info))
+`;
+            const proc = spawn(py, ['-c', script]);
+            let output = '';
+            let error = '';
+            proc.stdout.on('data', d => { output += d.toString(); });
+            proc.stderr.on('data', d => { error += d.toString(); });
+            proc.on('close', () => {
+                try { resolve(JSON.parse(output.trim() || '{}')); } catch (_) { resolve({ stdout: output, stderr: error }); }
+            });
+        });
+    }
+
+    async checkPyRosetta() {
+        return new Promise((resolve) => {
+            const py = this.pythonPath;
+            const { spawn } = require('child_process');
+            const script = `
+import json
+resp = {'available': False}
+try:
+    import pyrosetta
+    resp['available'] = True
+    resp['version'] = getattr(pyrosetta, '__version__', None)
+except Exception as e:
+    resp['error'] = str(e)
+print(json.dumps(resp))
+`;
+            const proc = spawn(py, ['-c', script]);
+            let output = '';
+            let error = '';
+            proc.stdout.on('data', d => { output += d.toString(); });
+            proc.stderr.on('data', d => { error += d.toString(); });
+            proc.on('close', () => {
+                try { resolve(JSON.parse(output.trim() || '{}')); } catch (_) { resolve({ stdout: output, stderr: error }); }
+            });
+        });
+    }
+
+    async installPyRosettaViaInstaller({ silent = true } = {}) {
+        return new Promise((resolve) => {
+            const py = this.pythonPath;
+            const { spawn } = require('child_process');
+            const cmd = `${silent ? 'silent=True' : 'silent=False'}`;
+            const script = `
+import json, sys, subprocess
+result = {'ok': False}
+try:
+    subprocess.check_call([sys.executable, '-m', 'pip', 'install', '--upgrade', 'pip', 'setuptools', 'wheel'])
+    subprocess.check_call([sys.executable, '-m', 'pip', 'install', 'pyrosetta-installer'])
+    import pyrosetta_installer as I
+    I.install_pyrosetta(${cmd}, skip_if_installed=False)
+    result['ok'] = True
+except Exception as e:
+    result['error'] = str(e)
+print(json.dumps(result))
+`;
+            const proc = spawn(py, ['-c', script]);
+            let output = '';
+            let error = '';
+            proc.stdout.on('data', d => { output += d.toString(); });
+            proc.stderr.on('data', d => { error += d.toString(); });
+            proc.on('close', () => {
+                try { resolve(JSON.parse(output.trim() || '{}')); } catch (_) { resolve({ stdout: output, stderr: error }); }
+            });
+        });
+    }
+
+    async findRosettaScripts({ exe_path } = {}) {
+        try {
+            const resolved = this.resolveRosettaScriptsPath(exe_path);
+            return { resolved };
+        } catch (e) {
+            return { error: e.message };
+        }
+    }
+
+    async searchPyRosettaWheels({ directory }) {
+        const fs = require('fs');
+        const path = require('path');
+        const results = [];
+        try {
+            const files = fs.readdirSync(directory || '.');
+            for (const f of files) {
+                if (/pyrosetta.*\.whl$/i.test(f) || /PyRosetta.*\.whl$/i.test(f)) {
+                    results.push(path.join(directory, f));
+                }
+            }
+        } catch (e) {
+            return { error: e.message };
+        }
+        return { matches: results };
+    }
+
     resolveRosettaScriptsPath(preferredPath) {
-        if (preferredPath && preferredPath.length > 0) {
-            return preferredPath;
-        }
+        const fs = require('fs');
 
-        if (process.env.ROSETTA_BIN && process.env.ROSETTA_BIN.includes('rosetta_scripts')) {
-            return process.env.ROSETTA_BIN;
-        }
+        const resolveFrom = (p) => {
+            if (!p || !p.length) return null;
+            try {
+                const stat = fs.existsSync(p) ? fs.statSync(p) : null;
+                if (stat && stat.isFile()) return p;
+                if (stat && stat.isDirectory()) {
+                    const files = fs.readdirSync(p);
+                    const match = files.find(f => f.startsWith('rosetta_scripts'));
+                    if (match) return path.join(p, match);
+                }
+            } catch (_) {}
+            return null;
+        };
 
+        // 1) Preferred explicit path or directory
+        const fromPreferred = resolveFrom(preferredPath);
+        if (fromPreferred) return fromPreferred;
+
+        // 2) Environment override: file or directory
+        const fromEnv = resolveFrom(process.env.ROSETTA_BIN || '');
+        if (fromEnv) return fromEnv;
+
+        // 3) Known candidate directories
         const candidateDirs = [
             // Typical source build locations
             path.join(process.env.HOME || '', 'rosetta', 'main', 'source', 'bin'),
@@ -30,7 +157,6 @@ class RosettaMCPServer {
             '/Users/arielben-sasson/dev/open_repos/rosetta/main/source/bin'
         ].filter(Boolean);
 
-        const fs = require('fs');
         for (const dir of candidateDirs) {
             try {
                 const files = fs.readdirSync(dir);
@@ -243,6 +369,194 @@ print(json.dumps({"score": float(score)}))
         });
     }
 
+    async pyrosettaIntrospect({ query, kind, max_results }) {
+        return new Promise((resolve) => {
+            const py = this.pythonPath;
+            const safeQuery = (typeof query === 'string' ? query : '').replace(/`/g, '');
+            const limit = Number.isInteger(max_results) && max_results > 0 ? max_results : 50;
+            const script = `
+import json, sys, importlib, inspect
+try:
+    import pyrosetta
+except Exception as e:
+    print(json.dumps({"error": f"PyRosetta not available: {str(e)}"}))
+    raise SystemExit(0)
+
+namespaces = [
+    'pyrosetta.rosetta.protocols.moves',
+    'pyrosetta.rosetta.protocols.simple_moves',
+    'pyrosetta.rosetta.protocols.minimization_packing',
+    'pyrosetta.rosetta.protocols.relax',
+    'pyrosetta.rosetta.protocols.rosetta_scripts',
+    'pyrosetta.rosetta.protocols.simple_filters',
+    'pyrosetta.rosetta.protocols.filters',
+    'pyrosetta.rosetta.core.select.residue_selector',
+    'pyrosetta.rosetta.core.pack.task.operation',
+]
+
+q = '${safeQuery}'.lower()
+kind = '${(kind||'').toString().toLowerCase()}'
+
+def kind_allows(module_name: str) -> bool:
+    if not kind:
+        return True
+    m = module_name.lower()
+    if kind in ('mover','movers'):
+        return '.protocols.' in m and ('moves' in m or 'simple_moves' in m or 'relax' in m or 'minimization_packing' in m)
+    if kind in ('filter','filters'):
+        return '.protocols.' in m and ('filters' in m or 'simple_filters' in m)
+    if kind in ('selector','residue_selector','residue_selectors'):
+        return 'residue_selector' in m
+    if kind in ('task','task_operation','task_operations'):
+        return '.task.operation' in m
+    return True
+
+results = []
+for mod_name in namespaces:
+    try:
+        m = importlib.import_module(mod_name)
+    except Exception:
+        continue
+    try:
+        for name, obj in inspect.getmembers(m, inspect.isclass):
+            if q and q not in name.lower():
+                continue
+            if not kind_allows(getattr(obj, '__module__', '')):
+                continue
+            entry = {
+                'name': name,
+                'module': getattr(obj, '__module__', ''),
+                'bases': [b.__name__ for b in getattr(obj, '__mro__', [])[1:3] if hasattr(b,'__name__')],
+            }
+            try:
+                entry['doc'] = (inspect.getdoc(obj) or '')[:2000]
+            except Exception:
+                entry['doc'] = None
+            try:
+                sig = str(inspect.signature(obj.__init__))
+                entry['init'] = sig
+            except Exception:
+                pass
+            results.append(entry)
+            if len(results) >= ${limit}:
+                raise StopIteration
+    except StopIteration:
+        break
+
+print(json.dumps({'results': results, 'count': len(results)}))
+`;
+            const proc = spawn(py, ['-c', script]);
+            let output = '';
+            let error = '';
+            proc.stdout.on('data', d => { output += d.toString(); });
+            proc.stderr.on('data', d => { error += d.toString(); });
+            proc.on('close', () => {
+                try {
+                    const parsed = JSON.parse(output.trim() || '{}');
+                    resolve(parsed);
+                } catch (_) {
+                    resolve({ stdout: output, stderr: error });
+                }
+            });
+        });
+    }
+
+    async rosettaScriptsSchema({ exe_path, cache_dir, extract_elements }) {
+        return new Promise((resolve, reject) => {
+            const fs = require('fs');
+            const os = require('os');
+            const rosettaExe = this.resolveRosettaScriptsPath(exe_path);
+            const baseDir = cache_dir && cache_dir.length ? cache_dir : path.join(process.cwd(), 'docs_cache');
+            try {
+                if (!fs.existsSync(baseDir)) fs.mkdirSync(baseDir, { recursive: true });
+            } catch (e) {
+                reject(new Error(`Failed to ensure cache_dir exists: ${e.message}`));
+                return;
+            }
+            const schemaPath = path.join(baseDir, 'rosetta_scripts_schema.xsd');
+            const proc = spawn(rosettaExe, ['-parser:output_schema', schemaPath]);
+            let stdout = '';
+            let stderr = '';
+            proc.stdout.on('data', d => { stdout += d.toString(); });
+            proc.stderr.on('data', d => { stderr += d.toString(); });
+            proc.on('error', (e) => reject(new Error(`Failed to start rosetta_scripts: ${e.message}`)));
+            proc.on('close', (code) => {
+                if (code !== 0) {
+                    resolve({ exit_code: code, stdout, stderr });
+                    return;
+                }
+                try {
+                    const content = fs.readFileSync(schemaPath, 'utf8');
+                    let elements = undefined;
+                    if (extract_elements) {
+                        const matches = [...content.matchAll(/\bname=\"([^\"]+)\"/g)].map(m => m[1]);
+                        // de-duplicate and filter common XML names
+                        const skip = new Set(['schema','annotation','element','complexType','sequence','choice','attribute','documentation']);
+                        elements = Array.from(new Set(matches)).filter(n => !skip.has(n)).slice(0, 1000);
+                    }
+                    resolve({ exit_code: 0, schema_path: schemaPath, size: content.length, elements });
+                } catch (e) {
+                    resolve({ exit_code: 0, error: `Schema generated but could not be read: ${e.message}`, schema_path: schemaPath });
+                }
+            });
+        });
+    }
+
+    async cacheCliDocs({ exe_path, cache_dir }) {
+        return new Promise((resolve, reject) => {
+            const fs = require('fs');
+            const rosettaExe = this.resolveRosettaScriptsPath(exe_path);
+            const baseDir = cache_dir && cache_dir.length ? cache_dir : path.join(process.cwd(), 'docs_cache');
+            try { if (!fs.existsSync(baseDir)) fs.mkdirSync(baseDir, { recursive: true }); } catch (e) { reject(new Error(`Failed to ensure cache_dir exists: ${e.message}`)); return; }
+
+            const runHelp = (args, outfile) => new Promise((res) => {
+                const proc = spawn(rosettaExe, args);
+                let output = '';
+                let error = '';
+                proc.stdout.on('data', d => { output += d.toString(); });
+                proc.stderr.on('data', d => { error += d.toString(); });
+                proc.on('close', () => {
+                    try { fs.writeFileSync(path.join(baseDir, outfile), output + (error ? `\nSTDERR:\n${error}` : '')); } catch (_) {}
+                    res({ stdout: output, stderr: error });
+                });
+            });
+
+            (async () => {
+                const r1 = await runHelp(['-help'], 'help.txt');
+                // Best-effort: try additional parser info flags; ignore failures
+                const r2 = await runHelp(['-parser:info'], 'parser_info.txt');
+                resolve({ saved: [path.join(baseDir, 'help.txt'), path.join(baseDir, 'parser_info.txt')] });
+            })();
+        });
+    }
+
+    async getCachedDocs({ cache_dir, query, max_lines }) {
+        return new Promise((resolve, reject) => {
+            const fs = require('fs');
+            const baseDir = cache_dir && cache_dir.length ? cache_dir : path.join(process.cwd(), 'docs_cache');
+            const files = ['help.txt', 'parser_info.txt'].map(f => path.join(baseDir, f));
+            const q = (query || '').toLowerCase();
+            try {
+                let results = [];
+                for (const file of files) {
+                    if (!fs.existsSync(file)) continue;
+                    const content = fs.readFileSync(file, 'utf8');
+                    const lines = content.split(/\r?\n/);
+                    for (let i = 0; i < lines.length; i++) {
+                        const line = lines[i];
+                        if (!q || line.toLowerCase().includes(q)) {
+                            results.push({ file, line: i + 1, text: line });
+                        }
+                    }
+                }
+                const limit = Number.isInteger(max_lines) && max_lines > 0 ? max_lines : 200;
+                resolve({ count: results.length, matches: results.slice(0, limit) });
+            } catch (e) {
+                reject(new Error(`Failed to search cache: ${e.message}`));
+            }
+        });
+    }
+
     async listAvailableFunctions() {
         const info = await this.getRosettaInfo();
         return {
@@ -275,14 +589,17 @@ class RosettaMCPServerMCP {
     }
 
     setupMCPHandlers() {
-        // Handle MCP protocol messages
+        // Handle MCP protocol messages (line-delimited JSON)
         process.stdin.setEncoding('utf8');
-        process.stdin.on('data', async (data) => {
+        const rl = readline.createInterface({ input: process.stdin, crlfDelay: Infinity });
+        rl.on('line', async (line) => {
+            const trimmed = line && line.trim();
+            if (!trimmed) return;
             try {
-                const message = JSON.parse(data);
+                const message = JSON.parse(trimmed);
                 await this.handleMCPMessage(message);
             } catch (e) {
-                this.sendError('Failed to parse message', e.message);
+                this.sendError('Failed to parse message', e.message || String(e));
             }
         });
     }
@@ -293,12 +610,23 @@ class RosettaMCPServerMCP {
         try {
             let result;
             switch (method) {
-                case 'initialize':
+                // Ignore notifications (no response expected)
+                case undefined:
+                    return;
+                default:
+                    if (typeof method === 'string' && method.startsWith('notifications/')) {
+                        return;
+                    }
+                    // fallthrough
+            }
+            switch (method) {
+                case 'initialize': {
+                    const requestedProtocol = (params && params.protocolVersion) ? params.protocolVersion : '2024-11-05';
                     result = {
-                        protocolVersion: '2024-11-05',
+                        protocolVersion: requestedProtocol,
                         capabilities: {
-                            tools: {},
-                            resources: {}
+                            tools: { list: true, call: true },
+                            resources: { list: true, read: true }
                         },
                         serverInfo: {
                             name: 'rosetta-mcp-server',
@@ -306,6 +634,7 @@ class RosettaMCPServerMCP {
                         }
                     };
                     break;
+                }
 
                 case 'tools/list':
                     result = {
@@ -373,9 +702,99 @@ class RosettaMCPServerMCP {
                                     },
                                     required: ['pdb_path']
                                 }
+                            },
+                            {
+                                name: 'pyrosetta_introspect',
+                                description: 'Search PyRosetta API classes (movers/filters/selectors) and return docs and signatures',
+                                inputSchema: {
+                                    type: 'object',
+                                    properties: {
+                                        query: { type: 'string', description: 'Substring to match class names' },
+                                        kind: { type: 'string', description: 'Filter by kind: mover|filter|selector|task' },
+                                        max_results: { type: 'number', description: 'Max number of results (default 50)' }
+                                    }
+                                }
+                            },
+                            {
+                                name: 'rosetta_scripts_schema',
+                                description: 'Generate and cache RosettaScripts XML schema (XSD) and optionally extract element names',
+                                inputSchema: {
+                                    type: 'object',
+                                    properties: {
+                                        exe_path: { type: 'string', description: 'Path to rosetta_scripts executable (optional)' },
+                                        cache_dir: { type: 'string', description: 'Directory to store schema' },
+                                        extract_elements: { type: 'boolean', description: 'If true, return a list of element names' }
+                                    }
+                                }
+                            },
+                            {
+                                name: 'cache_cli_docs',
+                                description: 'Run rosetta_scripts help and save outputs for offline search',
+                                inputSchema: {
+                                    type: 'object',
+                                    properties: {
+                                        exe_path: { type: 'string', description: 'Path to rosetta_scripts executable (optional)' },
+                                        cache_dir: { type: 'string', description: 'Directory to save docs' }
+                                    }
+                                }
+                            },
+                            {
+                                name: 'get_cached_docs',
+                                description: 'Search locally cached CLI docs for a query',
+                                inputSchema: {
+                                    type: 'object',
+                                    properties: {
+                                        cache_dir: { type: 'string', description: 'Directory where docs are cached' },
+                                        query: { type: 'string', description: 'Search string' },
+                                        max_lines: { type: 'number', description: 'Max number of lines to return (default 200)' }
+                                    }
+                                }
+                            },
+                            {
+                                name: 'python_env_info',
+                                description: 'Get Python executable, version, and pip list for the MCP environment',
+                                inputSchema: { type: 'object', properties: {} }
+                            },
+                            {
+                                name: 'check_pyrosetta',
+                                description: 'Check if PyRosetta is importable in the MCP Python environment',
+                                inputSchema: { type: 'object', properties: {} }
+                            },
+                            {
+                                name: 'install_pyrosetta_installer',
+                                description: 'Install PyRosetta using pyrosetta-installer (non-conda path)',
+                                inputSchema: { type: 'object', properties: { silent: { type: 'boolean' } } }
+                            },
+                            {
+                                name: 'find_rosetta_scripts',
+                                description: 'Resolve the rosetta_scripts executable path (from exe_path/env/known dirs)',
+                                inputSchema: { type: 'object', properties: { exe_path: { type: 'string' } } }
+                            },
+                            {
+                                name: 'search_pyrosetta_wheels',
+                                description: 'Search a directory for PyRosetta wheel files',
+                                inputSchema: { type: 'object', properties: { directory: { type: 'string' } } }
                             }
                         ]
                     };
+                    break;
+
+                case 'resources/list':
+                    result = { resources: [] };
+                    break;
+                case 'resources/read': {
+                    const uri = params && params.uri ? params.uri : '';
+                    result = { uri, mimeType: 'text/plain', text: '' };
+                    break;
+                }
+                case 'logging/setLevel':
+                    result = {};
+                    break;
+                case 'ping':
+                    result = { ok: true };
+                    break;
+                case 'shutdown':
+                    result = {};
                     break;
 
                 case 'tools/call':
@@ -407,6 +826,48 @@ class RosettaMCPServerMCP {
                                 pdb_path: args.pdb_path,
                                 scorefxn: args.scorefxn
                             });
+                            break;
+                        case 'pyrosetta_introspect':
+                            result = await this.rosettaServer.pyrosettaIntrospect({
+                                query: args.query,
+                                kind: args.kind,
+                                max_results: args.max_results
+                            });
+                            break;
+                        case 'rosetta_scripts_schema':
+                            result = await this.rosettaServer.rosettaScriptsSchema({
+                                exe_path: args.exe_path,
+                                cache_dir: args.cache_dir,
+                                extract_elements: args.extract_elements
+                            });
+                            break;
+                        case 'cache_cli_docs':
+                            result = await this.rosettaServer.cacheCliDocs({
+                                exe_path: args.exe_path,
+                                cache_dir: args.cache_dir
+                            });
+                            break;
+                        case 'get_cached_docs':
+                            result = await this.rosettaServer.getCachedDocs({
+                                cache_dir: args.cache_dir,
+                                query: args.query,
+                                max_lines: args.max_lines
+                            });
+                            break;
+                        case 'python_env_info':
+                            result = await this.rosettaServer.pythonEnvInfo();
+                            break;
+                        case 'check_pyrosetta':
+                            result = await this.rosettaServer.checkPyRosetta();
+                            break;
+                        case 'install_pyrosetta_installer':
+                            result = await this.rosettaServer.installPyRosettaViaInstaller({ silent: args && args.silent });
+                            break;
+                        case 'find_rosetta_scripts':
+                            result = await this.rosettaServer.findRosettaScripts({ exe_path: args && args.exe_path });
+                            break;
+                        case 'search_pyrosetta_wheels':
+                            result = await this.rosettaServer.searchPyRosettaWheels({ directory: args && args.directory });
                             break;
                         default:
                             throw new Error(`Unknown tool: ${name}`);
