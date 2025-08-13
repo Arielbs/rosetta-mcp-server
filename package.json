@@ -1,0 +1,32 @@
+{
+  "name": "rosetta-mcp-server",
+  "version": "1.0.0",
+  "description": "MCP server for Rosetta/PyRosetta functions and properties",
+  "main": "rosetta_mcp_wrapper.js",
+  "bin": {
+    "rosetta-mcp-server": "./rosetta_mcp_wrapper.js"
+  },
+  "scripts": {
+    "start": "node rosetta_mcp_wrapper.js",
+    "test": "python3 rosetta_mcp_server.py info",
+    "install-global": "npm install -g ."
+  },
+  "keywords": [
+    "mcp",
+    "rosetta",
+    "pyrosetta",
+    "protein",
+    "modeling",
+    "bioinformatics"
+  ],
+  "author": "Your Name",
+  "license": "MIT",
+  "dependencies": {},
+  "engines": {
+    "node": ">=14.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/yourusername/rosetta-mcp-server.git"
+  }
+}
