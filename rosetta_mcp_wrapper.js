@@ -706,199 +706,195 @@ print(json.dumps({'results': results, 'count': len(results)}))
         return new Promise((resolve) => {
             const py = this.pythonPath;
             const script = `
-import json, re
-from xml.etree import ElementTree as ET
+import json
+import xml.etree.ElementTree as ET
 
-def xml_to_pyrosetta(xml_content, include_comments=True, output_format='python'):
-    """Convert RosettaScripts XML to PyRosetta Python code"""
+try:
+    # Parse XML
+    xml_content = '''${xml_content.replace(/'/g, "'\\''")}'''
+    root = ET.fromstring(xml_content)
     
-    try:
-        # Parse XML
-        root = ET.fromstring(xml_content)
-        
-        # Extract movers, filters, and other components
-        movers = []
-        filters = []
-        residue_selectors = []
-        task_operations = []
-        
-        for elem in root.iter():
-            tag = elem.tag
-            if tag == 'FastRelax':
-                movers.append(('FastRelax', elem.attrib))
-            elif tag == 'MinMover':
-                movers.append(('MinMover', elem.attrib))
-            elif tag == 'PackRotamersMover':
-                movers.append(('PackRotamersMover', elem.attrib))
-            elif tag == 'ScoreType':
-                filters.append(('ScoreType', elem.attrib))
-            elif tag == 'Chain':
-                residue_selectors.append(('Chain', elem.attrib))
-            elif tag == 'RestrictToRepacking':
-                task_operations.append(('RestrictToRepacking', elem.attrib))
-        
-        # Generate Python code
-        python_code = []
-        
-        if include_comments:
-            python_code.append('# Generated PyRosetta code from RosettaScripts XML')
-            python_code.append('# ' + '='*50)
-            python_code.append('')
-        
-        # Import statements
-        python_code.append('import pyrosetta')
-        python_code.append('from pyrosetta import pose_from_pdb')
-        python_code.append('from pyrosetta.rosetta.protocols.moves import *')
-        python_code.append('from pyrosetta.rosetta.protocols.simple_moves import *')
-        python_code.append('from pyrosetta.rosetta.protocols.filters import *')
-        python_code.append('from pyrosetta.rosetta.core.select.residue_selector import *')
-        python_code.append('from pyrosetta.rosetta.core.pack.task.operation import *')
-        python_code.append('')
-        
-        # Initialize PyRosetta
-        python_code.append('# Initialize PyRosetta')
-        python_code.append('pyrosetta.init("-mute all")')
-        python_code.append('')
-        
-        # Load pose
-        python_code.append('# Load your PDB file')
-        python_code.append('pose = pose_from_pdb("your_protein.pdb")')
-        python_code.append('')
-        
-        # Create movers
-        if movers:
-            if include_comments:
-                python_code.append('# Create movers')
-            for mover_name, attrs in movers:
-                if mover_name == 'FastRelax':
-                    python_code.append(f'fast_relax = FastRelax()')
-                    if 'scorefxn' in attrs:
-                        python_code.append(f'fast_relax.score_function = get_score_function("{attrs["scorefxn"]}")')
-                elif mover_name == 'MinMover':
-                    python_code.append(f'min_mover = MinMover()')
-                    if 'scorefxn' in attrs:
-                        python_code.append(f'min_mover.score_function = get_score_function("{attrs["scorefxn"]}")')
-                elif mover_name == 'PackRotamersMover':
-                    python_code.append(f'pack_rotamers = PackRotamersMover()')
-                    if 'scorefxn' in attrs:
-                        python_code.append(f'pack_rotamers.score_function = get_score_function("{attrs["scorefxn"]}")')
-            python_code.append('')
-        
-        # Create filters
-        if filters:
-            if include_comments:
-                python_code.append('# Create filters')
-            for filter_name, attrs in filters:
-                if filter_name == 'ScoreType':
-                    python_code.append(f'score_filter = ScoreType()')
-                    if 'score_type' in attrs:
-                        python_code.append(f'score_filter.score_type = "{attrs["score_type"]}"')
-                    if 'threshold' in attrs:
-                        python_code.append(f'score_filter.threshold = {attrs["threshold"]}')
-            python_code.append('')
-        
-        # Create residue selectors
-        if residue_selectors:
-            if include_comments:
-                python_code.append('# Create residue selectors')
-            for selector_name, attrs in residue_selectors:
-                if selector_name == 'Chain':
-                    python_code.append(f'chain_selector = Chain()')
-                    if 'chains' in attrs:
-                        python_code.append(f'chain_selector.chain = "{attrs["chains"]}"')
-            python_code.append('')
-        
-        # Create task operations
-        if task_operations:
-            if include_comments:
-                python_code.append('# Create task operations')
-            for op_name, attrs in task_operations:
-                if op_name == 'RestrictToRepacking':
-                    python_code.append(f'restrict_repack = RestrictToRepacking()')
-            python_code.append('')
-        
-        # Apply movers
-        if movers:
-            if include_comments:
-                python_code.append('# Apply movers to pose')
-            for mover_name, _ in movers:
-                if mover_name == 'FastRelax':
-                    python_code.append('fast_relax.apply(pose)')
-                elif mover_name == 'MinMover':
-                    python_code.append('min_mover.apply(pose)')
-                elif mover_name == 'PackRotamersMover':
-                    python_code.append('pack_rotamers.apply(pose)')
-            python_code.append('')
-        
-        # Save result
-        python_code.append('# Save the result')
-        python_code.append('pose.dump_pdb("output.pdb")')
-        python_code.append('')
-        
-        # Print score
-        python_code.append('# Print final score')
-        python_code.append('score = pose.energies().total_energy()')
-        python_code.append('print(f"Final score: {score}")')
-        
-        # If no components found, provide a basic template
-        if not movers and not filters and not residue_selectors and not task_operations:
-            python_code = [
-                '# Generated PyRosetta code from RosettaScripts XML',
-                '# ==================================================',
-                '#',
-                '# No specific components found in XML, providing basic template:',
-                '',
-                'import pyrosetta',
-                'from pyrosetta import pose_from_pdb',
-                'from pyrosetta.rosetta.protocols.moves import *',
-                'from pyrosetta.rosetta.protocols.simple_moves import *',
-                'from pyrosetta.rosetta.protocols.filters import *',
-                'from pyrosetta.rosetta.core.select.residue_selector import *',
-                'from pyrosetta.rosetta.core.pack.task.operation import *',
-                '',
-                '# Initialize PyRosetta',
-                'pyrosetta.init("-mute all")',
-                '',
-                '# Load your PDB file',
-                'pose = pose_from_pdb("your_protein.pdb")',
-                '',
-                '# Add your PyRosetta code here based on the XML',
-                '# Example:',
-                '# fast_relax = FastRelax()',
-                '# fast_relax.apply(pose)',
-                '',
-                '# Save the result',
-                'pose.dump_pdb("output.pdb")',
-                '',
-                '# Print final score',
-                'score = pose.energies().total_energy()',
-                'print(f"Final score: {score}")'
-            ]
-        
-        result = {
-            'success': True,
-            'python_code': '\\n'.join(python_code),
-            'components_found': {
-                'movers': len(movers),
-                'filters': len(filters),
-                'residue_selectors': len(residue_selectors),
-                'task_operations': len(task_operations)
-            },
-            'xml_parsed': True,
-            'xml_content': xml_content[:200] + '...' if len(xml_content) > 200 else xml_content
-        }
-        
-    except Exception as e:
-        result = {
-            'success': False,
-            'error': str(e),
-            'xml_parsed': False
-        }
+    # Extract components
+    movers = []
+    filters = []
+    residue_selectors = []
+    task_operations = []
     
-    print(json.dumps(result))
+    for elem in root.iter():
+        tag = elem.tag
+        if tag == 'FastRelax':
+            movers.append(('FastRelax', elem.attrib))
+        elif tag == 'MinMover':
+            movers.append(('MinMover', elem.attrib))
+        elif tag == 'PackRotamersMover':
+            movers.append(('PackRotamersMover', elem.attrib))
+        elif tag == 'ScoreType':
+            filters.append(('ScoreType', elem.attrib))
+        elif tag == 'Chain':
+            residue_selectors.append(('Chain', elem.attrib))
+        elif tag == 'RestrictToRepacking':
+            task_operations.append(('RestrictToRepacking', elem.attrib))
+    
+    # Generate Python code
+    python_code = []
+    
+    if ${include_comments}:
+        python_code.append('# Generated PyRosetta code from RosettaScripts XML')
+        python_code.append('# ==================================================')
+        python_code.append('')
+    
+    # Import statements
+    python_code.append('import pyrosetta')
+    python_code.append('from pyrosetta import pose_from_pdb')
+    python_code.append('from pyrosetta.rosetta.protocols.moves import *')
+    python_code.append('from pyrosetta.rosetta.protocols.simple_moves import *')
+    python_code.append('from pyrosetta.rosetta.protocols.filters import *')
+    python_code.append('from pyrosetta.rosetta.core.select.residue_selector import *')
+    python_code.append('from pyrosetta.rosetta.core.pack.task.operation import *')
+    python_code.append('from pyrosetta.rosetta.core.scoring import get_score_function')
+    python_code.append('')
+    
+    # Initialize PyRosetta
+    python_code.append('# Initialize PyRosetta')
+    python_code.append('pyrosetta.init("-mute all")')
+    python_code.append('')
+    
+    # Load pose
+    python_code.append('# Load your PDB file')
+    python_code.append('pose = pose_from_pdb("your_protein.pdb")')
+    python_code.append('')
+    
+    # Create movers
+    if movers:
+        if ${include_comments}:
+            python_code.append('# Create movers')
+        for mover_name, attrs in movers:
+            if mover_name == 'FastRelax':
+                python_code.append('fast_relax = FastRelax()')
+                if 'scorefxn' in attrs:
+                    python_code.append(f'fast_relax.score_function = get_score_function("{attrs["scorefxn"]}")')
+            elif mover_name == 'MinMover':
+                python_code.append('min_mover = MinMover()')
+                if 'scorefxn' in attrs:
+                    python_code.append(f'min_mover.score_function = get_score_function("{attrs["scorefxn"]}")')
+            elif mover_name == 'PackRotamersMover':
+                python_code.append('pack_rotamers = PackRotamersMover()')
+                if 'scorefxn' in attrs:
+                    python_code.append(f'pack_rotamers.score_function = get_score_function("{attrs["scorefxn"]}")')
+        python_code.append('')
+    
+    # Create filters
+    if filters:
+        if ${include_comments}:
+            python_code.append('# Create filters')
+        for filter_name, attrs in filters:
+            if filter_name == 'ScoreType':
+                python_code.append('score_filter = ScoreType()')
+                if 'score_type' in attrs:
+                    python_code.append(f'score_filter.score_type = "{attrs["score_type"]}"')
+                if 'threshold' in attrs:
+                    python_code.append(f'score_filter.threshold = {attrs["threshold"]}')
+        python_code.append('')
+    
+    # Create residue selectors
+    if residue_selectors:
+        if ${include_comments}:
+            python_code.append('# Create residue selectors')
+        for selector_name, attrs in residue_selectors:
+            if selector_name == 'Chain':
+                python_code.append('chain_selector = Chain()')
+                if 'chains' in attrs:
+                    python_code.append(f'chain_selector.chain = "{attrs["chains"]}"')
+        python_code.append('')
+    
+    # Create task operations
+    if task_operations:
+        if ${include_comments}:
+            python_code.append('# Create task operations')
+        for op_name, attrs in task_operations:
+            if op_name == 'RestrictToRepacking':
+                python_code.append('restrict_repack = RestrictToRepacking()')
+        python_code.append('')
+    
+    # Apply movers
+    if movers:
+        if ${include_comments}:
+            python_code.append('# Apply movers to pose')
+        for mover_name, _ in movers:
+            if mover_name == 'FastRelax':
+                python_code.append('fast_relax.apply(pose)')
+            elif mover_name == 'MinMover':
+                python_code.append('min_mover.apply(pose)')
+            elif mover_name == 'PackRotamersMover':
+                python_code.append('pack_rotamers.apply(pose)')
+        python_code.append('')
+    
+    # Save result
+    python_code.append('# Save the result')
+    python_code.append('pose.dump_pdb("output.pdb")')
+    python_code.append('')
+    
+    # Print score
+    python_code.append('# Print final score')
+    python_code.append('score = pose.energies().total_energy()')
+    python_code.append('print(f"Final score: {score}")')
+    
+    # If no components found, provide a basic template
+    if not movers and not filters and not residue_selectors and not task_operations:
+        python_code = [
+            '# Generated PyRosetta code from RosettaScripts XML',
+            '# ==================================================',
+            '#',
+            '# No specific components found in XML, providing basic template:',
+            '',
+            'import pyrosetta',
+            'from pyrosetta import pose_from_pdb',
+            'from pyrosetta.rosetta.protocols.moves import *',
+            'from pyrosetta.rosetta.protocols.simple_moves import *',
+            'from pyrosetta.rosetta.protocols.filters import *',
+            'from pyrosetta.rosetta.core.select.residue_selector import *',
+            'from pyrosetta.rosetta.core.pack.task.operation import *',
+            '',
+            '# Initialize PyRosetta',
+            'pyrosetta.init("-mute all")',
+            '',
+            '# Load your PDB file',
+            'pose = pose_from_pdb("your_protein.pdb")',
+            '',
+            '# Add your PyRosetta code here based on the XML',
+            '# Example:',
+            '# fast_relax = FastRelax()',
+            '# fast_relax.apply(pose)',
+            '',
+            '# Save the result',
+            'pose.dump_pdb("output.pdb")',
+            '',
+            '# Print final score',
+            'score = pose.energies().total_energy()',
+            'print(f"Final score: {score}")'
+        ]
+    
+    result = {
+        'success': True,
+        'python_code': '\\n'.join(python_code),
+        'components_found': {
+            'movers': len(movers),
+            'filters': len(filters),
+            'residue_selectors': len(residue_selectors),
+            'task_operations': len(task_operations)
+        },
+        'xml_parsed': True,
+        'xml_content': xml_content[:200] + '...' if len(xml_content) > 200 else xml_content
+    }
 
-# Call the function with the provided arguments
-result = xml_to_pyrosetta(xml_content, include_comments, output_format)
+except Exception as e:
+    result = {
+        'success': False,
+        'error': str(e),
+        'xml_parsed': False,
+        'xml_content': '${xml_content[:200] + "..." if len(xml_content) > 200 else xml_content}'
+    }
+
 print(json.dumps(result))
 `;
 
