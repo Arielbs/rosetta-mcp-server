@@ -18,17 +18,77 @@ A Model Context Protocol (MCP) server that lets Cursor (or any MCP client) work 
 
 ## Quick start (non‑experts)
 
+### Option 1: Install from npm (recommended)
+```bash
+npm install -g rosetta-mcp-server
+```
+
+> **Note**: The npm install only installs the MCP server wrapper. PyRosetta installation happens automatically when you first use PyRosetta tools, which can take 10-30 minutes. Progress indicators will be shown during that installation.
+
+### ⚡ Installation Timeline
+1. **npm install** (seconds): Installs the MCP server wrapper
+2. **PyRosetta installation** (10-30 minutes): Either:
+   - **Option A**: Run `rosetta-install-pyrosetta` to install immediately
+   - **Option B**: Use any PyRosetta tool - it will auto-install PyRosetta
+3. **Subsequent uses** (seconds): PyRosetta already installed, fast execution
+
+### Option 2: Install from source
 1) Install prerequisites (macOS examples)
 ```bash
 brew install node
 python3 --version
 ```
 
-2) Install this server globally
+2) Clone and install this server globally
 ```bash
-cd ~/dev/public_repos/rosetta-mcp-server
+git clone https://github.com/yourusername/rosetta-mcp-server.git
+cd rosetta-mcp-server
 npm install -g .
 ```
+
+## 🚀 PyRosetta Installation Commands
+
+After installing the package, you can install PyRosetta using these commands:
+
+### Command 1: Standalone installer (recommended)
+```bash
+rosetta-install-pyrosetta
+```
+
+### Command 2: npm script
+```bash
+npm run install-pyrosetta
+```
+
+### Command 3: Manual trigger
+```bash
+node -e "const { RosettaMCPServer } = require('rosetta-mcp-server'); const server = new RosettaMCPServer(); server.installPyRosettaViaInstaller().then(console.log);"
+```
+
+> **Note**: All methods will show progress indicators and warnings about the 10-30 minute installation time.
+
+## 🔄 **Auto-Install Behavior**
+
+**PyRosetta tools now auto-install PyRosetta when needed!**
+
+When you call any PyRosetta tool (like `pyrosetta_score` or `pyrosetta_introspect`):
+1. **Server checks** if PyRosetta is available
+2. **If missing**: Automatically starts PyRosetta installation with progress indicators
+3. **After installation**: Retries the original operation
+4. **Future calls**: Fast execution (PyRosetta already installed)
+
+This means you can start using PyRosetta tools immediately after npm install - no manual setup required!
+
+## 🆕 **Smart Environment Detection**
+
+**The installer now automatically detects and handles environment conflicts:**
+
+- **Detects Anaconda/Conda dependency issues**
+- **Creates fresh Python environment** when conflicts are found
+- **Installs PyRosetta in clean environment** to avoid conflicts
+- **Provides environment path** for future use
+
+**Environment location**: `~/.venv/pyrosetta_mcp_env/` (created automatically when needed)
 
 3) Register the server in Cursor
 Edit `~/.cursor/mcp.json` and add/update the `rosetta` entry:
@@ -54,6 +114,13 @@ Notes:
 Open Settings → MCP. The “rosetta” server should be green and its tools visible.
 
 ## Setting up the Python environment
+
+⚠️ **IMPORTANT: PyRosetta installation can take 10-30 minutes on first run!** This involves downloading and compiling large scientific libraries. Please be patient and do not interrupt the process.
+
+> **What happens when you install the npm package:**
+> - ✅ **Fast**: npm installs the MCP server wrapper (takes seconds)
+> - ⏳ **Later**: When you first use PyRosetta tools, the server automatically installs PyRosetta (takes 10-30 minutes)
+> - 🆕 **Smart**: If environment conflicts are detected, creates a clean environment at `~/pyrosetta_mcp_env/`
 
 Option A (uv virtualenv; recommended):
 ```bash
@@ -157,6 +224,7 @@ printf '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion
   - Confirm binary is executable (try `"$ROSETTA_BIN" -help`) or pass `exe_path` explicitly.
 - PyRosetta tools say “not available”
   - Install PyRosetta using `pyrosetta-installer` (pip) or conda.
+  - **Note**: First-time PyRosetta installation can take 10-30 minutes. The MCP server will show progress indicators during installation.
 
 ## Development
 ```

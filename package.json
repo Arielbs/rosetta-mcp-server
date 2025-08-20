@@ -1,15 +1,18 @@
 {
   "name": "rosetta-mcp-server",
-  "version": "1.0.0",
+  "version": "1.0.7",
   "description": "MCP server for Rosetta/PyRosetta functions and properties",
   "main": "rosetta_mcp_wrapper.js",
   "bin": {
-    "rosetta-mcp-server": "./rosetta_mcp_wrapper.js"
+    "rosetta-mcp-server": "./rosetta_mcp_wrapper.js",
+    "rosetta-install-pyrosetta": "./install_pyrosetta.js"
   },
   "scripts": {
     "start": "node rosetta_mcp_wrapper.js",
     "test": "python3 rosetta_mcp_server.py info",
-    "install-global": "npm install -g ."
+    "install-global": "npm install -g .",
+    "prepublishOnly": "npm test",
+    "install-pyrosetta": "node install_pyrosetta.js"
   },
   "keywords": [
     "mcp",
@@ -17,7 +20,9 @@
     "pyrosetta",
     "protein",
     "modeling",
-    "bioinformatics"
+    "bioinformatics",
+    "mcp-server",
+    "model-context-protocol"
   ],
   "author": "Ariel Ben-Sasson",
   "license": "MIT",
@@ -27,6 +32,26 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/yourusername/rosetta-mcp-server.git"
-  }
+    "url": "git+https://github.com/yourusername/rosetta-mcp-server.git"
+  },
+  "bugs": {
+    "url": "https://github.com/yourusername/rosetta-mcp-server/issues"
+  },
+  "homepage": "https://github.com/yourusername/rosetta-mcp-server#readme",
+  "files": [
+    "rosetta_mcp_wrapper.js",
+    "rosetta_mcp_server.py",
+    "install_pyrosetta.js",
+    "assets/",
+    "docs_cache/"
+  ],
+  "os": [
+    "darwin",
+    "linux",
+    "win32"
+  ],
+  "cpu": [
+    "x64",
+    "arm64"
+  ]
 }

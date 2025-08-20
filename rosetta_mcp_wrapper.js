@@ -18,6 +18,9 @@ class RosettaMCPServer {
         return new Promise((resolve) => {
             const py = this.pythonPath;
             const { spawn } = require('child_process');
+            
+            console.error('\x1b[36m[Python] Gathering environment information...\x1b[0m');
+            
             const script = `
 import json, sys, subprocess
 info = {
@@ -37,7 +40,14 @@ print(json.dumps(info))
             proc.stdout.on('data', d => { output += d.toString(); });
             proc.stderr.on('data', d => { error += d.toString(); });
             proc.on('close', () => {
-                try { resolve(JSON.parse(output.trim() || '{}')); } catch (_) { resolve({ stdout: output, stderr: error }); }
+                try { 
+                    const result = JSON.parse(output.trim() || '{}');
+                    console.error(`\x1b[32m[Python] ✅ Environment info gathered (${result.pip_list ? result.pip_list.length : 0} packages)\x1b[0m`);
+                    resolve(result);
+                } catch (_) { 
+                    console.error(`\x1b[31m[Python] ❌ Failed to gather environment info: ${error}\x1b[0m`);
+                    resolve({ stdout: output, stderr: error }); 
+                }
             });
         });
     }
@@ -46,6 +56,9 @@ print(json.dumps(info))
         return new Promise((resolve) => {
             const py = this.pythonPath;
             const { spawn } = require('child_process');
+            
+            console.error('\x1b[36m[PyRosetta] Checking if PyRosetta is available...\x1b[0m');
+            
             const script = `
 import json
 resp = {'available': False}
@@ -63,7 +76,18 @@ print(json.dumps(resp))
             proc.stdout.on('data', d => { output += d.toString(); });
             proc.stderr.on('data', d => { error += d.toString(); });
             proc.on('close', () => {
-                try { resolve(JSON.parse(output.trim() || '{}')); } catch (_) { resolve({ stdout: output, stderr: error }); }
+                try { 
+                    const result = JSON.parse(output.trim() || '{}');
+                    if (result.available) {
+                        console.error(`\x1b[32m[PyRosetta] ✅ Available${result.version ? ` (v${result.version})` : ''}\x1b[0m`);
+                    } else {
+                        console.error(`\x1b[31m[PyRosetta] ❌ Not available: ${result.error || 'Unknown error'}\x1b[0m`);
+                    }
+                    resolve(result);
+                } catch (_) { 
+                    console.error(`\x1b[31m[PyRosetta] ❌ Check failed: ${error}\x1b[0m`);
+                    resolve({ stdout: output, stderr: error }); 
+                }
             });
         });
     }
@@ -72,27 +96,96 @@ print(json.dumps(resp))
         return new Promise((resolve) => {
             const py = this.pythonPath;
             const { spawn } = require('child_process');
+            
+            // Show warning about long installation time
+            console.error('\x1b[33m⚠️  WARNING: PyRosetta installation can take 10-30 minutes on first run!\x1b[0m');
+            console.error('\x1b[33m   This involves downloading and compiling large scientific libraries.\x1b[0m');
+            console.error('\x1b[33m   Please be patient and do not interrupt the process.\x1b[0m\n');
+            
             const cmd = `${silent ? 'silent=True' : 'silent=False'}`;
             const script = `
-import json, sys, subprocess
-result = {'ok': False}
+import json, sys, subprocess, time
+result = {'ok': False, 'progress': []}
+
+def log_progress(message):
+    result['progress'].append({'time': time.time(), 'message': message})
+    print(json.dumps({'type': 'progress', 'message': message}))
+
 try:
+    log_progress('Upgrading pip, setuptools, and wheel...')
     subprocess.check_call([sys.executable, '-m', 'pip', 'install', '--upgrade', 'pip', 'setuptools', 'wheel'])
+    
+    log_progress('Installing pyrosetta-installer...')
     subprocess.check_call([sys.executable, '-m', 'pip', 'install', 'pyrosetta-installer'])
+    
+    log_progress('Importing pyrosetta-installer...')
     import pyrosetta_installer as I
+    
+    log_progress('Starting PyRosetta installation (this will take 10-30 minutes)...')
     I.install_pyrosetta(${cmd}, skip_if_installed=False)
+    
+    log_progress('PyRosetta installation completed successfully!')
     result['ok'] = True
 except Exception as e:
     result['error'] = str(e)
-print(json.dumps(result))
+    log_progress(f'Installation failed: {str(e)}')
+
+print(json.dumps({'type': 'final', 'result': result}))
 `;
             const proc = spawn(py, ['-c', script]);
             let output = '';
             let error = '';
-            proc.stdout.on('data', d => { output += d.toString(); });
-            proc.stderr.on('data', d => { error += d.toString(); });
+            
+            proc.stdout.on('data', (d) => { 
+                const data = d.toString();
+                output += data;
+                
+                // Parse progress messages
+                try {
+                    const lines = data.split('\n').filter(line => line.trim());
+                    for (const line of lines) {
+                        try {
+                            const parsed = JSON.parse(line);
+                            if (parsed.type === 'progress') {
+                                console.error(`\x1b[36m[PyRosetta Install] ${parsed.message}\x1b[0m`);
+                            } else if (parsed.type === 'final') {
+                                // Final result, don't log here
+                            }
+                        } catch (e) {
+                            // Not JSON, ignore
+                        }
+                    }
+                } catch (e) {
+                    // Ignore parsing errors
+                }
+            });
+            
+            proc.stderr.on('data', (d) => { 
+                error += d.toString();
+                // Show stderr output in real-time
+                console.error(`\x1b[31m[PyRosetta Install Error] ${d.toString()}\x1b[0m`);
+            });
+            
             proc.on('close', () => {
-                try { resolve(JSON.parse(output.trim() || '{}')); } catch (_) { resolve({ stdout: output, stderr: error }); }
+                try {
+                    // Extract the final result from the last line
+                    const lines = output.split('\n').filter(line => line.trim());
+                    for (let i = lines.length - 1; i >= 0; i--) {
+                        try {
+                            const parsed = JSON.parse(lines[i]);
+                            if (parsed.type === 'final') {
+                                resolve(parsed.result);
+                                return;
+                            }
+                        } catch (e) {
+                            // Continue searching
+                        }
+                    }
+                    // Fallback to old parsing method
+                    resolve(JSON.parse(output.trim() || '{}'));
+                } catch (e) {
+                    resolve({ stdout: output, stderr: error });
+                }
             });
         });
     }
@@ -325,10 +418,30 @@ print(json.dumps(result))
     }
 
     async pyrosettaScore({ pdb_path, scorefxn }) {
-        return new Promise((resolve, reject) => {
+        return new Promise(async (resolve, reject) => {
             if (!pdb_path) {
                 reject(new Error('pdb_path is required'));
                 return;
+            }
+
+            // Check if PyRosetta is available
+            const pyrosettaStatus = await this.checkPyRosetta();
+            if (!pyrosettaStatus.available) {
+                // Auto-install PyRosetta if not available
+                console.error('\x1b[33m⚠️  PyRosetta not found. Auto-installing...\x1b[0m');
+                console.error('\x1b[33m   This will take 10-30 minutes. Please be patient.\x1b[0m\n');
+                
+                try {
+                    const installResult = await this.installPyRosettaViaInstaller({ silent: false });
+                    if (!installResult.ok) {
+                        reject(new Error(`PyRosetta installation failed: ${installResult.error || 'Unknown error'}`));
+                        return;
+                    }
+                    console.error('\x1b[32m✅ PyRosetta installed successfully! Retrying score operation...\x1b[0m\n');
+                } catch (installError) {
+                    reject(new Error(`PyRosetta installation failed: ${installError.message}`));
+                    return;
+                }
             }
 
             const py = this.pythonPath;
@@ -370,8 +483,28 @@ print(json.dumps({"score": float(score)}))
     }
 
     async pyrosettaIntrospect({ query, kind, max_results }) {
-        return new Promise((resolve) => {
+        return new Promise(async (resolve) => {
             const py = this.pythonPath;
+            
+            // Check if PyRosetta is available
+            const pyrosettaStatus = await this.checkPyRosetta();
+            if (!pyrosettaStatus.available) {
+                // Auto-install PyRosetta if not available
+                console.error('\x1b[33m⚠️  PyRosetta not found. Auto-installing...\x1b[0m');
+                console.error('\x1b[33m   This will take 10-30 minutes. Please be patient.\x1b[0m\n');
+                
+                try {
+                    const installResult = await this.installPyRosettaViaInstaller({ silent: false });
+                    if (!installResult.ok) {
+                        resolve({ error: `PyRosetta installation failed: ${installResult.error || 'Unknown error'}` });
+                        return;
+                    }
+                    console.error('\x1b[32m✅ PyRosetta installed successfully! Retrying introspect operation...\x1b[0m\n');
+                } catch (installError) {
+                    resolve({ error: `PyRosetta installation failed: ${installError.message}` });
+                    return;
+                }
+            }
             const safeQuery = (typeof query === 'string' ? query : '').replace(/`/g, '');
             const limit = Number.isInteger(max_results) && max_results > 0 ? max_results : 50;
             const script = `
