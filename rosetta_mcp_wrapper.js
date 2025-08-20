@@ -702,23 +702,50 @@ print(json.dumps({'results': results, 'count': len(results)}))
         });
     }
 
-    // Simple HTTPS fetch utility
-    async fetchUrl(url) {
+    // Simple HTTPS fetch utility with redirect support
+    async fetchUrl(url, maxRedirects = 5) {
         const https = require('https');
-        return new Promise((resolve, reject) => {
-            try {
-                const req = https.get(url, { headers: { 'User-Agent': 'rosetta-mcp/1.0 (+https://npmjs.com/package/rosetta-mcp-server)' } }, (res) => {
-                    let body = '';
-                    res.on('data', (d) => { body += d.toString(); });
-                    res.on('end', () => {
-                        resolve({ status: res.statusCode, headers: res.headers, body });
+        const http = require('http');
+        
+        const fetchWithRedirect = (url, redirectCount = 0) => {
+            return new Promise((resolve, reject) => {
+                if (redirectCount >= maxRedirects) {
+                    reject(new Error(`Too many redirects (${redirectCount})`));
+                    return;
+                }
+                
+                const isHttps = url.startsWith('https://');
+                const client = isHttps ? https : http;
+                
+                try {
+                    const req = client.get(url, { 
+                        headers: { 
+                            'User-Agent': 'rosetta-mcp/1.0 (+https://npmjs.com/package/rosetta-mcp-server)' 
+                        } 
+                    }, (res) => {
+                        // Handle redirects
+                        if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
+                            const newUrl = res.headers.location.startsWith('http') 
+                                ? res.headers.location 
+                                : `${isHttps ? 'https' : 'http'}://${new URL(url).host}${res.headers.location}`;
+                            resolve(fetchWithRedirect(newUrl, redirectCount + 1));
+                            return;
+                        }
+                        
+                        let body = '';
+                        res.on('data', (d) => { body += d.toString(); });
+                        res.on('end', () => {
+                            resolve({ status: res.statusCode, headers: res.headers, body });
+                        });
                     });
-                });
-                req.on('error', (err) => reject(err));
-            } catch (e) {
-                reject(e);
-            }
-        });
+                    req.on('error', (err) => reject(err));
+                } catch (e) {
+                    reject(e);
+                }
+            });
+        };
+        
+        return fetchWithRedirect(url);
     }
 
     stripHtml(html) {
@@ -778,7 +805,22 @@ print(json.dumps({'results': results, 'count': len(results)}))
         if (!url || typeof url !== 'string') return { error: 'url is required' };
         try {
             const resp = await this.fetchUrl(url);
-            if (resp.status !== 200) return { error: `Fetch failed with status ${resp.status}`, url };
+            if (resp.status !== 200) {
+                let suggestion = 'Check if the URL is correct and accessible';
+                if (resp.status >= 300 && resp.status < 400) {
+                    suggestion = 'URL may have redirected - try the search tool first';
+                } else if (resp.status === 403) {
+                    suggestion = 'Access denied - try using the search tool to find accessible URLs';
+                } else if (resp.status === 404) {
+                    suggestion = 'Page not found - URL may be outdated, try the search tool';
+                }
+                
+                return { 
+                    error: `Fetch failed with status ${resp.status}`, 
+                    url,
+                    suggestion
+                };
+            }
             const html = resp.body || '';
             const titleMatch = html.match(/<title>([\s\S]*?)<\/title>/i);
             const title = titleMatch ? this.stripHtml(titleMatch[1]).slice(0, 200) : undefined;
