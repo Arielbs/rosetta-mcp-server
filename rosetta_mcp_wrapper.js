@@ -562,9 +562,21 @@ for mod_name in namespaces:
                 'bases': [b.__name__ for b in getattr(obj, '__mro__', [])[1:3] if hasattr(b,'__name__')],
             }
             try:
-                entry['doc'] = (inspect.getdoc(obj) or '')[:2000]
+                doc = inspect.getdoc(obj)
+                if doc:
+                    entry['doc'] = doc[:2000]
+                else:
+                    # Try to get more info if no doc
+                    try:
+                        if hasattr(obj, '__init__'):
+                            sig = inspect.signature(obj.__init__)
+                            entry['doc'] = f"Constructor signature: {sig}"
+                        else:
+                            entry['doc'] = f"Class {name} from {mod_name}"
+                    except:
+                        entry['doc'] = f"Class {name} from {mod_name}"
             except Exception:
-                entry['doc'] = None
+                entry['doc'] = f"Class {name} from {mod_name}"
             try:
                 sig = str(inspect.signature(obj.__init__))
                 entry['init'] = sig
@@ -828,6 +840,41 @@ def xml_to_pyrosetta(xml_content, include_comments=True, output_format='python')
         python_code.append('score = pose.energies().total_energy()')
         python_code.append('print(f"Final score: {score}")')
         
+        # If no components found, provide a basic template
+        if not movers and not filters and not residue_selectors and not task_operations:
+            python_code = [
+                '# Generated PyRosetta code from RosettaScripts XML',
+                '# ==================================================',
+                '#',
+                '# No specific components found in XML, providing basic template:',
+                '',
+                'import pyrosetta',
+                'from pyrosetta import pose_from_pdb',
+                'from pyrosetta.rosetta.protocols.moves import *',
+                'from pyrosetta.rosetta.protocols.simple_moves import *',
+                'from pyrosetta.rosetta.protocols.filters import *',
+                'from pyrosetta.rosetta.core.select.residue_selector import *',
+                'from pyrosetta.rosetta.core.pack.task.operation import *',
+                '',
+                '# Initialize PyRosetta',
+                'pyrosetta.init("-mute all")',
+                '',
+                '# Load your PDB file',
+                'pose = pose_from_pdb("your_protein.pdb")',
+                '',
+                '# Add your PyRosetta code here based on the XML',
+                '# Example:',
+                '# fast_relax = FastRelax()',
+                '# fast_relax.apply(pose)',
+                '',
+                '# Save the result',
+                'pose.dump_pdb("output.pdb")',
+                '',
+                '# Print final score',
+                'score = pose.energies().total_energy()',
+                'print(f"Final score: {score}")'
+            ]
+        
         result = {
             'success': True,
             'python_code': '\\n'.join(python_code),
@@ -837,7 +884,8 @@ def xml_to_pyrosetta(xml_content, include_comments=True, output_format='python')
                 'residue_selectors': len(residue_selectors),
                 'task_operations': len(task_operations)
             },
-            'xml_parsed': True
+            'xml_parsed': True,
+            'xml_content': xml_content[:200] + '...' if len(xml_content) > 200 else xml_content
         }
         
     except Exception as e:
@@ -848,6 +896,10 @@ def xml_to_pyrosetta(xml_content, include_comments=True, output_format='python')
         }
     
     print(json.dumps(result))
+
+# Call the function with the provided arguments
+result = xml_to_pyrosetta(xml_content, include_comments, output_format)
+print(json.dumps(result))
 `;
 
             const proc = spawn(py, ['-c', script]);
