@@ -79,6 +79,59 @@ When you call any PyRosetta tool (like `pyrosetta_score` or `pyrosetta_introspec
 
 This means you can start using PyRosetta tools immediately after npm install - no manual setup required!
 
+## 🔄 **XML to PyRosetta Translation**
+
+**Convert RosettaScripts XML to PyRosetta Python code automatically!**
+
+### **Example XML Input:**
+```xml
+<ROSETTASCRIPTS>
+  <SCOREFXNS>
+    <ScoreFunction name="ref2015" weights="ref2015"/>
+  </SCOREFXNS>
+  <MOVERS>
+    <FastRelax name="relax" scorefxn="ref2015"/>
+  </MOVERS>
+  <PROTOCOLS>
+    <Add mover="relax"/>
+  </PROTOCOLS>
+</ROSETTASCRIPTS>
+```
+
+### **Generated PyRosetta Code:**
+```python
+# Generated PyRosetta code from RosettaScripts XML
+# ==================================================
+
+import pyrosetta
+from pyrosetta import pose_from_pdb
+from pyrosetta.rosetta.protocols.moves import *
+from pyrosetta.rosetta.protocols.simple_moves import *
+from pyrosetta.rosetta.protocols.filters import *
+from pyrosetta.rosetta.core.select.residue_selector import *
+from pyrosetta.rosetta.core.pack.task.operation import *
+
+# Initialize PyRosetta
+pyrosetta.init("-mute all")
+
+# Load your PDB file
+pose = pose_from_pdb("your_protein.pdb")
+
+# Create movers
+fast_relax = FastRelax()
+fast_relax.score_function = get_score_function("ref2015")
+
+# Apply movers to pose
+fast_relax.apply(pose)
+
+# Save the result
+pose.dump_pdb("output.pdb")
+
+# Print final score
+score = pose.energies().total_energy()
+print(f"Final score: {score}")
+```
+
 ## 🆕 **Smart Environment Detection**
 
 **The installer now automatically detects and handles environment conflicts:**
@@ -157,6 +210,7 @@ conda install -c rosettacommons pyrosetta -y
 - `get_rosetta_info`, `list_functions`, `get_rosetta_help`: curated info
 - `pyrosetta_score` (optional): score a PDB using PyRosetta
 - `pyrosetta_introspect` (optional): search PyRosetta classes; return docs/signatures
+- `xml_to_pyrosetta` (optional): translate RosettaScripts XML to PyRosetta Python code
 - Helpers for setup: `python_env_info`, `check_pyrosetta`, `install_pyrosetta_installer`, `find_rosetta_scripts`, `search_pyrosetta_wheels`
 
 ## Examples per tool (human‑readable Q&A)
@@ -206,6 +260,11 @@ conda install -c rosettacommons pyrosetta -y
   - Question: “Find ‘FastRelax’ mover (or any mover/filter/selector/task).”
   - Provide: `query: "FastRelax"`, optional `kind: "mover|filter|selector|task"`.
   - Answer: `{ results: [{ name, module, bases, doc, init }, ...], count }`.
+
+- xml_to_pyrosetta (requires PyRosetta)
+  - Question: "Convert this RosettaScripts XML to PyRosetta Python code."
+  - Provide: `xml_content: "<your XML string>"`, optional `include_comments: true`, `output_format: "python"`.
+  - Answer: `{ success: true, python_code: "...", components_found: {...} }`.
 
 ## Verify from the command line (optional)
 ```bash
