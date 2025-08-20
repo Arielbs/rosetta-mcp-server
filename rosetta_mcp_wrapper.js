@@ -702,6 +702,93 @@ print(json.dumps({'results': results, 'count': len(results)}))
         });
     }
 
+    // Simple HTTPS fetch utility
+    async fetchUrl(url) {
+        const https = require('https');
+        return new Promise((resolve, reject) => {
+            try {
+                const req = https.get(url, { headers: { 'User-Agent': 'rosetta-mcp/1.0 (+https://npmjs.com/package/rosetta-mcp-server)' } }, (res) => {
+                    let body = '';
+                    res.on('data', (d) => { body += d.toString(); });
+                    res.on('end', () => {
+                        resolve({ status: res.statusCode, headers: res.headers, body });
+                    });
+                });
+                req.on('error', (err) => reject(err));
+            } catch (e) {
+                reject(e);
+            }
+        });
+    }
+
+    stripHtml(html) {
+        if (!html) return '';
+        // Remove scripts/styles then tags, collapse whitespace
+        return html
+            .replace(/<script[\s\S]*?<\/script>/gi, '')
+            .replace(/<style[\s\S]*?<\/style>/gi, '')
+            .replace(/<[^>]+>/g, ' ')
+            .replace(/\s+/g, ' ')
+            .trim();
+    }
+
+    async searchRosettaWebDocs({ query, max_results }) {
+        const max = Number.isInteger(max_results) && max_results > 0 ? max_results : 3;
+        const q = encodeURIComponent(`site:rosettacommons.org/docs ${query || ''}`.trim());
+        // Use DuckDuckGo HTML endpoint (no JS) for simple scraping
+        const searchUrl = `https://duckduckgo.com/html/?q=${q}`;
+        try {
+            const resp = await this.fetchUrl(searchUrl);
+            if (resp.status !== 200) return { error: `Search failed with status ${resp.status}` };
+            const html = resp.body || '';
+            // Extract anchors; prefer links pointing to rosettacommons.org
+            const linkRegex = /<a[^>]+href="([^"]+)"[^>]*>([\s\S]*?)<\/a>/gi;
+            const results = [];
+            let m;
+            while ((m = linkRegex.exec(html)) !== null && results.length < max * 3) {
+                let href = m[1];
+                const text = this.stripHtml(m[2]);
+                // DuckDuckGo may wrap URLs with '/l/?kh=-1&uddg=<ENCODED>'
+                const uddgMatch = href.match(/[?&]uddg=([^&]+)/);
+                if (uddgMatch) {
+                    try { href = decodeURIComponent(uddgMatch[1]); } catch (_) {}
+                }
+                if (/rosettacommons\.org\/.*/i.test(href)) {
+                    results.push({ title: text.slice(0, 150), url: href });
+                }
+            }
+            // De-duplicate and cap to max
+            const seen = new Set();
+            const deduped = [];
+            for (const r of results) {
+                const key = r.url.split('#')[0];
+                if (seen.has(key)) continue;
+                seen.add(key);
+                deduped.push(r);
+                if (deduped.length >= max) break;
+            }
+            return { query, results: deduped, count: deduped.length };
+        } catch (e) {
+            return { error: `Search error: ${e.message}` };
+        }
+    }
+
+    async getRosettaWebDoc({ url, max_chars }) {
+        const limit = Number.isInteger(max_chars) && max_chars > 0 ? max_chars : 4000;
+        if (!url || typeof url !== 'string') return { error: 'url is required' };
+        try {
+            const resp = await this.fetchUrl(url);
+            if (resp.status !== 200) return { error: `Fetch failed with status ${resp.status}`, url };
+            const html = resp.body || '';
+            const titleMatch = html.match(/<title>([\s\S]*?)<\/title>/i);
+            const title = titleMatch ? this.stripHtml(titleMatch[1]).slice(0, 200) : undefined;
+            const text = this.stripHtml(html).slice(0, limit);
+            return { url, title, text, length: text.length };
+        } catch (e) {
+            return { error: `Fetch error: ${e.message}`, url };
+        }
+    }
+
     async xmlToPyRosetta({ xml_content, include_comments = true, output_format = 'python' }) {
         return new Promise((resolve) => {
             const py = this.pythonPath;
@@ -1165,6 +1252,30 @@ class RosettaMCPServerMCP {
                                     },
                                     required: ['xml_content']
                                 }
+                            },
+                            {
+                                name: 'search_rosetta_web_docs',
+                                description: 'Search online Rosetta documentation and return top matches',
+                                inputSchema: {
+                                    type: 'object',
+                                    properties: {
+                                        query: { type: 'string', description: 'Search query (e.g., FastRelax, AtomPair constraint)' },
+                                        max_results: { type: 'number', description: 'Number of results to return (default 3)' }
+                                    },
+                                    required: ['query']
+                                }
+                            },
+                            {
+                                name: 'get_rosetta_web_doc',
+                                description: 'Fetch and summarize a specific Rosetta docs URL',
+                                inputSchema: {
+                                    type: 'object',
+                                    properties: {
+                                        url: { type: 'string', description: 'Full URL to a Rosetta docs page' },
+                                        max_chars: { type: 'number', description: 'Max characters of cleaned text to return (default 4000)' }
+                                    },
+                                    required: ['url']
+                                }
                             }
                         ]
                     };
@@ -1265,6 +1376,18 @@ class RosettaMCPServerMCP {
                                 xml_content: args.xml_content,
                                 include_comments: args.include_comments,
                                 output_format: args.output_format
+                            });
+                            break;
+                        case 'search_rosetta_web_docs':
+                            result = await this.rosettaServer.searchRosettaWebDocs({
+                                query: args.query,
+                                max_results: args.max_results
+                            });
+                            break;
+                        case 'get_rosetta_web_doc':
+                            result = await this.rosettaServer.getRosettaWebDoc({
+                                url: args.url,
+                                max_chars: args.max_chars
                             });
                             break;
                         default:
