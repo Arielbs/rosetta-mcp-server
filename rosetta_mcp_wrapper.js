@@ -705,6 +705,7 @@ print(json.dumps({'results': results, 'count': len(results)}))
     async xmlToPyRosetta({ xml_content, include_comments = true, output_format = 'python' }) {
         return new Promise((resolve) => {
             const py = this.pythonPath;
+            const includeCommentsPython = include_comments ? 'True' : 'False';
             const script = `
 import json
 import xml.etree.ElementTree as ET
@@ -738,7 +739,7 @@ try:
     # Generate Python code
     python_code = []
     
-    if ${include_comments}:
+    if ${includeCommentsPython}:
         python_code.append('# Generated PyRosetta code from RosettaScripts XML')
         python_code.append('# ==================================================')
         python_code.append('')
@@ -766,7 +767,7 @@ try:
     
     # Create movers
     if movers:
-        if ${include_comments}:
+        if ${includeCommentsPython}:
             python_code.append('# Create movers')
         for mover_name, attrs in movers:
             if mover_name == 'FastRelax':
@@ -785,7 +786,7 @@ try:
     
     # Create filters
     if filters:
-        if ${include_comments}:
+        if ${includeCommentsPython}:
             python_code.append('# Create filters')
         for filter_name, attrs in filters:
             if filter_name == 'ScoreType':
@@ -798,7 +799,7 @@ try:
     
     # Create residue selectors
     if residue_selectors:
-        if ${include_comments}:
+        if ${includeCommentsPython}:
             python_code.append('# Create residue selectors')
         for selector_name, attrs in residue_selectors:
             if selector_name == 'Chain':
@@ -809,7 +810,7 @@ try:
     
     # Create task operations
     if task_operations:
-        if ${include_comments}:
+        if ${includeCommentsPython}:
             python_code.append('# Create task operations')
         for op_name, attrs in task_operations:
             if op_name == 'RestrictToRepacking':
@@ -818,7 +819,7 @@ try:
     
     # Apply movers
     if movers:
-        if ${include_comments}:
+        if ${includeCommentsPython}:
             python_code.append('# Apply movers to pose')
         for mover_name, _ in movers:
             if mover_name == 'FastRelax':
