@@ -1040,6 +1040,20 @@ class RosettaMCPServerMCP {
         this.setupMCPHandlers();
     }
 
+    isToolAllowed(name) {
+        const toName = (s) => (s || '').split(',').map(x => x.trim().toLowerCase()).filter(Boolean);
+        const allowList = toName(process.env.MCP_TOOLS);
+        const denyList = toName(process.env.MCP_TOOLS_DENY);
+        const lname = String(name || '').toLowerCase();
+        if (allowList.length > 0) {
+            return allowList.includes(lname);
+        }
+        if (denyList.length > 0) {
+            return !denyList.includes(lname);
+        }
+        return true;
+    }
+
     setupMCPHandlers() {
         // Handle MCP protocol messages (line-delimited JSON)
         process.stdin.setEncoding('utf8');
@@ -1088,9 +1102,8 @@ class RosettaMCPServerMCP {
                     break;
                 }
 
-                case 'tools/list':
-                    result = {
-                        tools: [
+                case 'tools/list': {
+                    const allTools = [
                             {
                                 name: 'get_rosetta_info',
                                 description: 'Get comprehensive Rosetta information',
@@ -1277,9 +1290,10 @@ class RosettaMCPServerMCP {
                                     required: ['url']
                                 }
                             }
-                        ]
-                    };
+                    ];
+                    result = { tools: allTools.filter(t => this.isToolAllowed(t.name)) };
                     break;
+                }
 
                 case 'resources/list':
                     result = { resources: [] };
@@ -1301,6 +1315,9 @@ class RosettaMCPServerMCP {
 
                 case 'tools/call':
                     const { name, arguments: args } = params;
+                    if (!this.isToolAllowed(name)) {
+                        throw new Error(`Tool disabled by server policy: ${name}`);
+                    }
                     switch (name) {
                         case 'get_rosetta_info':
                             result = await this.rosettaServer.getRosettaInfo();
