@@ -892,7 +892,7 @@ except Exception as e:
         'success': False,
         'error': str(e),
         'xml_parsed': False,
-        'xml_content': '${xml_content[:200] + "..." if len(xml_content) > 200 else xml_content}'
+        'xml_content': xml_content[:200] + '...' if len(xml_content) > 200 else xml_content
     }
 
 print(json.dumps(result))
