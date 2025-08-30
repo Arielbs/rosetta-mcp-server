@@ -1189,8 +1189,21 @@ class RosettaMCPServerMCP {
                     result = {
                         protocolVersion: requestedProtocol,
                         capabilities: {
-                            tools: { list: true, call: true },
-                            resources: { list: true, read: true }
+                            // Advertise both canonical and alternate capability names
+                            tools: { 
+                                list: true, 
+                                call: true,
+                                // Some clients expect these names
+                                listTools: true,
+                                callTool: true
+                            },
+                            resources: { 
+                                list: true, 
+                                read: true,
+                                // Some clients expect these names
+                                listResources: true,
+                                readResource: true
+                            }
                         },
                         serverInfo: {
                             name: 'rosetta-mcp-server',
