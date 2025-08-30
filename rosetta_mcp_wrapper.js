@@ -1086,26 +1086,7 @@ class RosettaMCPServerMCP {
     }
 
     isToolAllowed(name) {
-        const normalize = (s) => String(s || '')
-            .toLowerCase()
-            .replace(/[^a-z0-9]+/g, '_')
-            .replace(/^_+|_+$/g, '');
-        const parseList = (s) => (s || '')
-            .split(',')
-            .map(x => x.trim())
-            .filter(Boolean)
-            .map(normalize);
-        const allowList = parseList(process.env.MCP_TOOLS);
-        const denyList = parseList(process.env.MCP_TOOLS_DENY);
-        const lname = normalize(name);
-        if (allowList.length > 0) {
-            if (allowList.includes('*')) return true;
-            return allowList.includes(lname);
-        }
-        if (denyList.length > 0) {
-            if (denyList.includes('*')) return false;
-            return !denyList.includes(lname);
-        }
+        // Reverted to always allow tools (restore 1.1.1 behavior)
         return true;
     }
 
@@ -1408,15 +1389,8 @@ class RosettaMCPServerMCP {
                                 }
                             }
                     ];
-                    const filtered = allTools.filter(t => this.isToolAllowed(t.name));
-                    const { allowList } = this.getToolFilterState();
-                    if (filtered.length === 0 && allowList.length > 0) {
-                        // Fallback: if allow-list yields no matches, expose all tools by default
-                        console.error('\x1b[33m[MCP_TOOLS] Allow-list matched no tools; exposing all tools by default.\x1b[0m');
-                        result = { tools: allTools };
-                    } else {
-                        result = { tools: filtered };
-                    }
+                    // Always expose all tools
+                    result = { tools: allTools };
                     break;
                 }
 
@@ -1440,9 +1414,6 @@ class RosettaMCPServerMCP {
 
                 case 'tools/call':
                     const { name, arguments: args } = params;
-                    if (!this.isToolAllowed(name)) {
-                        throw new Error(`Tool disabled by server policy: ${name}`);
-                    }
                     switch (name) {
                         case 'get_rosetta_info':
                             result = await this.rosettaServer.getRosettaInfo();
