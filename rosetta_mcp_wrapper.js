@@ -1371,6 +1371,7 @@ class RosettaMCPServerMCP {
                                 name: 'search_pyrosetta_wheels',
                                 description: 'Search a directory for PyRosetta wheel files',
                                 inputSchema: {
+                                    type: 'object',
                                     properties: {
                                         directory: { type: 'string', description: 'Directory to search' }
                                     }
@@ -1380,6 +1381,7 @@ class RosettaMCPServerMCP {
                                 name: 'xml_to_pyrosetta',
                                 description: 'Translate RosettaScripts XML to PyRosetta Python code',
                                 inputSchema: {
+                                    type: 'object',
                                     properties: {
                                         xml_content: { 
                                             type: 'string', 
