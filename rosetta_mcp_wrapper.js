@@ -1082,6 +1082,8 @@ class RosettaMCPServerMCP {
         // Detect whether the client uses Content-Length framing (LSP-style)
         // or newline-delimited JSON. Default to newline; switch to headers if detected.
         this.useHeaders = false;
+        this.serverVersion = this.readPackageVersion();
+        this.debug = String(process.env.MCP_DEBUG || '').trim().length > 0;
         this.setupMCPHandlers();
     }
 
@@ -1104,6 +1106,19 @@ class RosettaMCPServerMCP {
             allowList: parseList(process.env.MCP_TOOLS),
             denyList: parseList(process.env.MCP_TOOLS_DENY)
         };
+    }
+
+    readPackageVersion() {
+        try {
+            const fs = require('fs');
+            const path = require('path');
+            const pkgPath = path.join(__dirname, 'package.json');
+            if (fs.existsSync(pkgPath)) {
+                const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
+                if (pkg && typeof pkg.version === 'string') return pkg.version;
+            }
+        } catch (_) {}
+        return 'unknown';
     }
 
     setupMCPHandlers() {
@@ -1131,8 +1146,10 @@ class RosettaMCPServerMCP {
                     buffer = buffer.slice(totalNeeded);
                     try {
                         const message = JSON.parse(jsonPayload);
+                        if (this.debug) console.error(`[mcp] <- headers method=${message && message.method}`);
                         await this.handleMCPMessage(message);
                     } catch (e) {
+                        if (this.debug) console.error(`[mcp] parse error (headers): ${e && e.message}`);
                         this.sendError('Failed to parse message', e.message || String(e));
                     }
                 }
@@ -1150,13 +1167,16 @@ class RosettaMCPServerMCP {
                     // Put the header back with a CRLF and switch to headers mode
                     this.useHeaders = true;
                     buffer = line + '\r\n' + buffer; // reconstruct header start
+                    if (this.debug) console.error('[mcp] switching to headers mode');
                     await tryProcessBuffer();
                     return;
                 }
                 try {
                     const message = JSON.parse(line);
+                    if (this.debug) console.error(`[mcp] <- newline method=${message && message.method}`);
                     await this.handleMCPMessage(message);
                 } catch (e) {
+                    if (this.debug) console.error(`[mcp] parse error (newline): ${e && e.message}`);
                     this.sendError('Failed to parse message', e.message || String(e));
                 }
             }
@@ -1173,6 +1193,7 @@ class RosettaMCPServerMCP {
 
         try {
             let result;
+            if (this.debug) console.error(`[mcp] handling method=${method}`);
             switch (method) {
                 // Ignore notifications (no response expected)
                 case undefined:
@@ -1207,7 +1228,7 @@ class RosettaMCPServerMCP {
                         },
                         serverInfo: {
                             name: 'rosetta-mcp-server',
-                            version: '1.0.0'
+                            version: this.serverVersion
                         }
                     };
                     break;
@@ -1404,6 +1425,7 @@ class RosettaMCPServerMCP {
                     ];
                     // Always expose all tools
                     result = { tools: allTools };
+                    if (this.debug) console.error(`[mcp] -> tools/list count=${allTools.length}`);
                     break;
                 }
 
