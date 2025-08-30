@@ -1079,36 +1079,111 @@ print(json.dumps(result))
 class RosettaMCPServerMCP {
     constructor() {
         this.rosettaServer = new RosettaMCPServer();
+        // Detect whether the client uses Content-Length framing (LSP-style)
+        // or newline-delimited JSON. Default to newline; switch to headers if detected.
+        this.useHeaders = false;
         this.setupMCPHandlers();
     }
 
     isToolAllowed(name) {
-        const toName = (s) => (s || '').split(',').map(x => x.trim().toLowerCase()).filter(Boolean);
-        const allowList = toName(process.env.MCP_TOOLS);
-        const denyList = toName(process.env.MCP_TOOLS_DENY);
-        const lname = String(name || '').toLowerCase();
+        const normalize = (s) => String(s || '')
+            .toLowerCase()
+            .replace(/[^a-z0-9]+/g, '_')
+            .replace(/^_+|_+$/g, '');
+        const parseList = (s) => (s || '')
+            .split(',')
+            .map(x => x.trim())
+            .filter(Boolean)
+            .map(normalize);
+        const allowList = parseList(process.env.MCP_TOOLS);
+        const denyList = parseList(process.env.MCP_TOOLS_DENY);
+        const lname = normalize(name);
         if (allowList.length > 0) {
+            if (allowList.includes('*')) return true;
             return allowList.includes(lname);
         }
         if (denyList.length > 0) {
+            if (denyList.includes('*')) return false;
             return !denyList.includes(lname);
         }
         return true;
     }
 
+    getToolFilterState() {
+        const normalize = (s) => String(s || '')
+            .toLowerCase()
+            .replace(/[^a-z0-9]+/g, '_')
+            .replace(/^_+|_+$/g, '');
+        const parseList = (s) => (s || '')
+            .split(',')
+            .map(x => x.trim())
+            .filter(Boolean)
+            .map(normalize);
+        return {
+            allowList: parseList(process.env.MCP_TOOLS),
+            denyList: parseList(process.env.MCP_TOOLS_DENY)
+        };
+    }
+
     setupMCPHandlers() {
-        // Handle MCP protocol messages (line-delimited JSON)
+        // Support BOTH newline-delimited JSON and Content-Length framed JSON
         process.stdin.setEncoding('utf8');
-        const rl = readline.createInterface({ input: process.stdin, crlfDelay: Infinity });
-        rl.on('line', async (line) => {
-            const trimmed = line && line.trim();
-            if (!trimmed) return;
-            try {
-                const message = JSON.parse(trimmed);
-                await this.handleMCPMessage(message);
-            } catch (e) {
-                this.sendError('Failed to parse message', e.message || String(e));
+        let buffer = '';
+
+        const tryProcessBuffer = async () => {
+            // If headers mode detected, parse Content-Length frames
+            if (this.useHeaders) {
+                while (true) {
+                    const headerEnd = buffer.indexOf('\r\n\r\n');
+                    if (headerEnd === -1) break;
+                    const header = buffer.slice(0, headerEnd);
+                    const lengthMatch = header.match(/Content-Length:\s*(\d+)/i);
+                    if (!lengthMatch) {
+                        // If no content-length, drop until next potential header separator
+                        buffer = buffer.slice(headerEnd + 4);
+                        continue;
+                    }
+                    const contentLength = parseInt(lengthMatch[1], 10);
+                    const totalNeeded = headerEnd + 4 + contentLength;
+                    if (buffer.length < totalNeeded) break; // wait for more data
+                    const jsonPayload = buffer.slice(headerEnd + 4, totalNeeded);
+                    buffer = buffer.slice(totalNeeded);
+                    try {
+                        const message = JSON.parse(jsonPayload);
+                        await this.handleMCPMessage(message);
+                    } catch (e) {
+                        this.sendError('Failed to parse message', e.message || String(e));
+                    }
+                }
+                return;
             }
+
+            // Newline-delimited JSON fallback (one message per line)
+            let newlineIndex;
+            while ((newlineIndex = buffer.indexOf('\n')) !== -1) {
+                const line = buffer.slice(0, newlineIndex).trim();
+                buffer = buffer.slice(newlineIndex + 1);
+                if (!line) continue;
+                // If we detect a Content-Length header, switch modes
+                if (/^Content-Length:\s*\d+\s*$/i.test(line)) {
+                    // Put the header back with a CRLF and switch to headers mode
+                    this.useHeaders = true;
+                    buffer = line + '\r\n' + buffer; // reconstruct header start
+                    await tryProcessBuffer();
+                    return;
+                }
+                try {
+                    const message = JSON.parse(line);
+                    await this.handleMCPMessage(message);
+                } catch (e) {
+                    this.sendError('Failed to parse message', e.message || String(e));
+                }
+            }
+        };
+
+        process.stdin.on('data', async (chunk) => {
+            buffer += chunk;
+            await tryProcessBuffer();
         });
     }
 
@@ -1333,7 +1408,15 @@ class RosettaMCPServerMCP {
                                 }
                             }
                     ];
-                    result = { tools: allTools.filter(t => this.isToolAllowed(t.name)) };
+                    const filtered = allTools.filter(t => this.isToolAllowed(t.name));
+                    const { allowList } = this.getToolFilterState();
+                    if (filtered.length === 0 && allowList.length > 0) {
+                        // Fallback: if allow-list yields no matches, expose all tools by default
+                        console.error('\x1b[33m[MCP_TOOLS] Allow-list matched no tools; exposing all tools by default.\x1b[0m');
+                        result = { tools: allTools };
+                    } else {
+                        result = { tools: filtered };
+                    }
                     break;
                 }
 
@@ -1470,7 +1553,14 @@ class RosettaMCPServerMCP {
             id,
             result
         };
-        process.stdout.write(JSON.stringify(response) + '\n');
+        const payload = JSON.stringify(response);
+        if (this.useHeaders) {
+            const head = `Content-Length: ${Buffer.byteLength(payload, 'utf8')}\r\n\r\n`;
+            process.stdout.write(head);
+            process.stdout.write(payload);
+        } else {
+            process.stdout.write(payload + '\n');
+        }
     }
 
     sendError(id, error) {
@@ -1482,7 +1572,14 @@ class RosettaMCPServerMCP {
                 message: error
             }
         };
-        process.stdout.write(JSON.stringify(response) + '\n');
+        const payload = JSON.stringify(response);
+        if (this.useHeaders) {
+            const head = `Content-Length: ${Buffer.byteLength(payload, 'utf8')}\r\n\r\n`;
+            process.stdout.write(head);
+            process.stdout.write(payload);
+        } else {
+            process.stdout.write(payload + '\n');
+        }
     }
 }
 
