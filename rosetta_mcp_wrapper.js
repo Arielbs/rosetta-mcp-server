@@ -1910,13 +1910,18 @@ try:
                 })
     else:
         lines = code_input.split('\\n')
+        seen_ids = set()
         for line in lines:
             line_lower = line.strip().lower()
             if not line_lower or line_lower.startswith('#'):
                 continue
             matched = False
             for key, mapping in rosetta_keywords.items():
+                mid = mapping.get('id', key)
+                if mid in seen_ids:
+                    continue
                 if key.lower().replace(' ', '_') in line_lower or key.lower().replace(' ', '.') in line_lower:
+                    seen_ids.add(mid)
                     if mapping.get('biotite'):
                         translated_parts.append({
                             'pyrosetta_line': line.strip(),
