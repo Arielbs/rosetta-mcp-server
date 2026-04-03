@@ -6,10 +6,12 @@
   "main": "rosetta_mcp_wrapper.js",
   "bin": {
     "rosetta-mcp-server": "./rosetta_mcp_wrapper.js",
-    "rosetta-install-pyrosetta": "./install_pyrosetta.js"
+    "rosetta-install-pyrosetta": "./install_pyrosetta.js",
+    "rosetta-mcp-http": "./rosetta_mcp_http.js"
   },
   "scripts": {
     "start": "node rosetta_mcp_wrapper.js",
+    "start:http": "node rosetta_mcp_http.js",
     "test": "python3 rosetta_mcp_server.py info",
     "install-global": "npm install -g .",
     "prepublishOnly": "npm test",
@@ -42,6 +44,7 @@
   "homepage": "https://github.com/Arielbs/rosetta-mcp-server#readme",
   "files": [
     "rosetta_mcp_wrapper.js",
+    "rosetta_mcp_http.js",
     "rosetta_mcp_server.py",
     "install_pyrosetta.js",
     "assets/",

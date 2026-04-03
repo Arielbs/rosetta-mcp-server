@@ -2151,203 +2151,121 @@ class RosettaMCPServerMCP {
 
                 case 'tools/list': {
                     const allTools = [
+                            // === Remote-safe tools (work without local PyRosetta/Rosetta) ===
                             {
                                 name: 'get_rosetta_info',
                                 description: 'Get comprehensive Rosetta installation info including available score functions, movers, filters, selectors, task operations, parameters, and command-line options. Use this first to understand what Rosetta components are available. For live PyRosetta API details, use pyrosetta_introspect.',
-                                inputSchema: { type: 'object', properties: {} }
+                                inputSchema: { type: 'object', properties: {} },
+                                annotations: { readOnlyHint: true, openWorldHint: false }
                             },
                             {
                                 name: 'get_rosetta_help',
                                 description: 'Get help for any Rosetta topic, mover, filter, or concept. Accepts general topics (score_functions, movers, filters, xml, parameters) or specific names (FastRelax, Ddg, ChainSelector). Auto-fetches live documentation when available.',
-                                inputSchema: {
-                                    type: 'object',
-                                    properties: {
-                                        topic: {
-                                            type: 'string',
-                                            description: 'Topic to get help for'
-                                        }
-                                    }
-                                }
+                                inputSchema: { type: 'object', properties: { topic: { type: 'string', description: 'Topic to get help for' } } },
+                                annotations: { readOnlyHint: true, openWorldHint: true }
                             },
                             {
                                 name: 'validate_xml',
                                 description: 'Validate a RosettaScripts XML protocol. Checks XML syntax and optionally validates element names against the Rosetta XSD schema. Use before run_rosetta_scripts to catch errors early.',
-                                inputSchema: {
-                                    type: 'object',
-                                    properties: {
-                                        xml_content: { type: 'string', description: 'XML content to validate' },
-                                        validate_against_schema: { type: 'boolean', description: 'If true, also check element names against the cached Rosetta XSD schema (default: false)' }
-                                    },
-                                    required: ['xml_content']
-                                }
-                            },
-                            {
-                                name: 'run_rosetta_scripts',
-                                description: 'Run a RosettaScripts XML protocol on an input PDB file. Use when executing Rosetta protocols. Requires rosetta_scripts binary.',
-                                inputSchema: {
-                                    type: 'object',
-                                    properties: {
-                                        exe_path: { type: 'string', description: 'Path to rosetta_scripts executable (optional if on PATH)' },
-                                        xml_path: { type: 'string', description: 'Path to Rosetta XML protocol' },
-                                        input_pdb: { type: 'string', description: 'Path to input PDB' },
-                                        out_dir: { type: 'string', description: 'Output directory' },
-                                        extra_flags: { type: 'array', items: { type: 'string' }, description: 'Additional command-line flags' }
-                                    },
-                                    required: ['xml_path', 'input_pdb', 'out_dir']
-                                }
-                            },
-                            {
-                                name: 'pyrosetta_score',
-                                description: 'Score a PDB file using PyRosetta. Returns total energy in REU. Use to evaluate structure quality or compare designs. Optionally returns per-residue energy breakdown.',
-                                inputSchema: {
-                                    type: 'object',
-                                    properties: {
-                                        pdb_path: { type: 'string', description: 'Path to input PDB' },
-                                        scorefxn: { type: 'string', description: 'Score function name (default: ref2015)' },
-                                        per_residue: { type: 'boolean', description: 'If true, include per-residue energy breakdown (default: false)' }
-                                    },
-                                    required: ['pdb_path']
-                                }
-                            },
-                            {
-                                name: 'pyrosetta_introspect',
-                                description: 'Search PyRosetta API classes (movers, filters, selectors, task operations) and return docs and signatures. Use to discover available PyRosetta classes or get constructor details.',
-                                inputSchema: {
-                                    type: 'object',
-                                    properties: {
-                                        query: { type: 'string', description: 'Substring to match class names' },
-                                        kind: { type: 'string', description: 'Filter by kind: mover|filter|selector|task' },
-                                        max_results: { type: 'number', description: 'Max number of results (default 50)' }
-                                    }
-                                }
-                            },
-                            {
-                                name: 'rosetta_scripts_schema',
-                                description: 'Generate and cache the RosettaScripts XML schema (XSD). Optionally extract element names. Use to get the authoritative list of valid XML elements.',
-                                inputSchema: {
-                                    type: 'object',
-                                    properties: {
-                                        exe_path: { type: 'string', description: 'Path to rosetta_scripts executable (optional)' },
-                                        cache_dir: { type: 'string', description: 'Directory to store schema' },
-                                        extract_elements: { type: 'boolean', description: 'If true, return a list of element names' }
-                                    }
-                                }
-                            },
-                            {
-                                name: 'get_cached_docs',
-                                description: 'Search locally cached Rosetta CLI docs for a keyword. Auto-caches on first use. Use to look up command-line flags or parser info.',
-                                inputSchema: {
-                                    type: 'object',
-                                    properties: {
-                                        cache_dir: { type: 'string', description: 'Directory where docs are cached' },
-                                        query: { type: 'string', description: 'Search string' },
-                                        max_lines: { type: 'number', description: 'Max number of lines to return (default 200)' }
-                                    }
-                                }
-                            },
-                            {
-                                name: 'python_env_info',
-                                description: 'Get Python executable path, version, and pip package list. Use to diagnose environment issues or verify package installations.',
-                                inputSchema: { type: 'object', properties: {} }
-                            },
-                            {
-                                name: 'check_pyrosetta',
-                                description: 'Check if PyRosetta is importable in the current environment. Use before PyRosetta-dependent tools to verify availability.',
-                                inputSchema: { type: 'object', properties: {} }
-                            },
-                            {
-                                name: 'install_pyrosetta_installer',
-                                description: 'Install PyRosetta using the pyrosetta-installer package. Takes 10-30 minutes. Use when PyRosetta is not available and needed for scoring or design.',
-                                inputSchema: { type: 'object', properties: { silent: { type: 'boolean' } } }
-                            },
-                            {
-                                name: 'find_rosetta_scripts',
-                                description: 'Resolve the rosetta_scripts executable path by checking exe_path, ROSETTA_BIN env, common directories, and PATH. Use to verify Rosetta is installed.',
-                                inputSchema: { type: 'object', properties: { exe_path: { type: 'string' } } }
+                                inputSchema: { type: 'object', properties: { xml_content: { type: 'string', description: 'XML content to validate' }, validate_against_schema: { type: 'boolean', description: 'If true, also check element names against the cached Rosetta XSD schema (default: false)' } }, required: ['xml_content'] },
+                                annotations: { readOnlyHint: true, openWorldHint: false }
                             },
                             {
                                 name: 'xml_to_pyrosetta',
                                 description: 'Translate RosettaScripts XML to equivalent PyRosetta Python code. Supports 37 element types including movers, filters, selectors, and task operations. Use when converting XML protocols to Python.',
-                                inputSchema: {
-                                    type: 'object',
-                                    properties: {
-                                        xml_content: { 
-                                            type: 'string', 
-                                            description: 'RosettaScripts XML content to translate' 
-                                        },
-                                        include_comments: { 
-                                            type: 'boolean', 
-                                            description: 'Include detailed comments in output (default: true)' 
-                                        },
-                                        output_format: { 
-                                            type: 'string', 
-                                            enum: ['python', 'script', 'function'], 
-                                            description: 'Output format (default: python)' 
-                                        }
-                                    },
-                                    required: ['xml_content']
-                                }
-                            },
-                            {
-                                name: 'search_rosetta_web_docs',
-                                description: 'Search online Rosetta documentation at rosettacommons.org. Use when you need docs for a specific Rosetta feature.',
-                                inputSchema: {
-                                    type: 'object',
-                                    properties: {
-                                        query: { type: 'string', description: 'Search query (e.g., FastRelax, AtomPair constraint)' },
-                                        max_results: { type: 'number', description: 'Number of results to return (default 3)' }
-                                    },
-                                    required: ['query']
-                                }
-                            },
-                            {
-                                name: 'get_rosetta_web_doc',
-                                description: 'Fetch and extract text from a specific Rosetta docs URL. Use after search_rosetta_web_docs to read a documentation page.',
-                                inputSchema: {
-                                    type: 'object',
-                                    properties: {
-                                        url: { type: 'string', description: 'Full URL to a Rosetta docs page' },
-                                        max_chars: { type: 'number', description: 'Max characters of cleaned text to return (default 4000)' }
-                                    },
-                                    required: ['url']
-                                }
+                                inputSchema: { type: 'object', properties: { xml_content: { type: 'string', description: 'RosettaScripts XML content to translate' }, include_comments: { type: 'boolean', description: 'Include detailed comments in output (default: true)' }, output_format: { type: 'string', enum: ['python', 'script', 'function'], description: 'Output format (default: python)' } }, required: ['xml_content'] },
+                                annotations: { readOnlyHint: true, openWorldHint: false }
                             },
                             {
                                 name: 'rosetta_to_biotite',
                                 description: 'ALWAYS use this tool when asked about Rosetta vs Biotite equivalents. Returns the Biotite equivalent of a Rosetta/PyRosetta function with working example code. Covers: structure I/O, SASA, RMSD, superimposition, secondary structure, distances, angles, contacts, hydrogen bonds, B-factors, interface analysis, database access, and residue selection.',
-                                inputSchema: {
-                                    type: 'object',
-                                    properties: {
-                                        query: { type: 'string', description: 'Rosetta method or concept name (e.g., "pose_from_pdb", "FastRelax", "SuperimposeMover", "SASA", "RMSD")' },
-                                        category: { type: 'string', description: 'Optional category filter (e.g., "Structure I/O", "Geometry", "Surface Analysis")' }
-                                    },
-                                    required: ['query']
-                                }
+                                inputSchema: { type: 'object', properties: { query: { type: 'string', description: 'Rosetta method or concept name (e.g., "pose_from_pdb", "FastRelax", "SASA", "RMSD")' }, category: { type: 'string', description: 'Optional category filter (e.g., "Structure I/O", "Geometry")' } }, required: ['query'] },
+                                annotations: { readOnlyHint: true, openWorldHint: false }
                             },
                             {
                                 name: 'biotite_to_rosetta',
                                 description: 'ALWAYS use this tool when asked about Biotite vs Rosetta equivalents. Returns the Rosetta/PyRosetta equivalent of a Biotite function with working example code. Covers: structure I/O, SASA, RMSD, superimposition, secondary structure, distances, angles, contacts, hydrogen bonds, B-factors, and residue selection.',
-                                inputSchema: {
-                                    type: 'object',
-                                    properties: {
-                                        query: { type: 'string', description: 'Biotite function or concept name (e.g., "sasa", "superimpose", "PDBFile.read", "annotate_sse")' },
-                                        category: { type: 'string', description: 'Optional category filter' }
-                                    },
-                                    required: ['query']
-                                }
+                                inputSchema: { type: 'object', properties: { query: { type: 'string', description: 'Biotite function or concept name (e.g., "sasa", "superimpose", "PDBFile.read")' }, category: { type: 'string', description: 'Optional category filter' } }, required: ['query'] },
+                                annotations: { readOnlyHint: true, openWorldHint: false }
                             },
                             {
                                 name: 'translate_rosetta_script_to_biotite',
                                 description: 'ALWAYS use this tool when asked to convert or translate Rosetta code to Biotite. Translates RosettaScripts XML or PyRosetta code to Biotite Python code. Analysis operations are translated; design/optimization are flagged as Rosetta-only.',
-                                inputSchema: {
-                                    type: 'object',
-                                    properties: {
-                                        code: { type: 'string', description: 'RosettaScripts XML content or PyRosetta Python code to translate' },
-                                        input_format: { type: 'string', enum: ['xml', 'pyrosetta', 'auto'], description: 'Input format (default: "auto")' },
-                                        include_comments: { type: 'boolean', description: 'Include explanatory comments in output (default: true)' }
-                                    },
-                                    required: ['code']
-                                }
+                                inputSchema: { type: 'object', properties: { code: { type: 'string', description: 'RosettaScripts XML content or PyRosetta Python code to translate' }, input_format: { type: 'string', enum: ['xml', 'pyrosetta', 'auto'], description: 'Input format (default: "auto")' }, include_comments: { type: 'boolean', description: 'Include explanatory comments in output (default: true)' } }, required: ['code'] },
+                                annotations: { readOnlyHint: true, openWorldHint: false }
+                            },
+                            {
+                                name: 'search_rosetta_web_docs',
+                                description: 'Search online Rosetta documentation at rosettacommons.org. Use when you need docs for a specific Rosetta feature.',
+                                inputSchema: { type: 'object', properties: { query: { type: 'string', description: 'Search query (e.g., FastRelax, AtomPair constraint)' }, max_results: { type: 'number', description: 'Number of results to return (default 3)' } }, required: ['query'] },
+                                annotations: { readOnlyHint: true, openWorldHint: true }
+                            },
+                            {
+                                name: 'get_rosetta_web_doc',
+                                description: 'Fetch and extract text from a specific Rosetta docs URL. Use after search_rosetta_web_docs to read a documentation page.',
+                                inputSchema: { type: 'object', properties: { url: { type: 'string', description: 'Full URL to a Rosetta docs page' }, max_chars: { type: 'number', description: 'Max characters of cleaned text to return (default 4000)' } }, required: ['url'] },
+                                annotations: { readOnlyHint: true, openWorldHint: true }
+                            },
+                            {
+                                name: 'get_local_setup',
+                                description: 'Get instructions for installing the full Rosetta MCP server locally with PyRosetta support. Use when a user needs scoring, structure optimization, introspection, or running RosettaScripts protocols -- these require a local installation.',
+                                inputSchema: { type: 'object', properties: {} },
+                                annotations: { readOnlyHint: true, openWorldHint: false }
+                            },
+                            // === Local-only tools (require PyRosetta/Rosetta binary) ===
+                            {
+                                name: 'run_rosetta_scripts',
+                                description: 'Run a RosettaScripts XML protocol on an input PDB file. Use when executing Rosetta protocols. Requires local installation with rosetta_scripts binary.',
+                                inputSchema: { type: 'object', properties: { exe_path: { type: 'string', description: 'Path to rosetta_scripts executable (optional if on PATH)' }, xml_path: { type: 'string', description: 'Path to Rosetta XML protocol' }, input_pdb: { type: 'string', description: 'Path to input PDB' }, out_dir: { type: 'string', description: 'Output directory' }, extra_flags: { type: 'array', items: { type: 'string' }, description: 'Additional command-line flags' } }, required: ['xml_path', 'input_pdb', 'out_dir'] },
+                                annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false }
+                            },
+                            {
+                                name: 'pyrosetta_score',
+                                description: 'Score a PDB file using PyRosetta. Returns total energy in REU. Use to evaluate structure quality or compare designs. Optionally returns per-residue energy breakdown. Requires local installation.',
+                                inputSchema: { type: 'object', properties: { pdb_path: { type: 'string', description: 'Path to input PDB' }, scorefxn: { type: 'string', description: 'Score function name (default: ref2015)' }, per_residue: { type: 'boolean', description: 'If true, include per-residue energy breakdown (default: false)' } }, required: ['pdb_path'] },
+                                annotations: { readOnlyHint: true, openWorldHint: false }
+                            },
+                            {
+                                name: 'pyrosetta_introspect',
+                                description: 'Search PyRosetta API classes (movers, filters, selectors, task operations) and return docs and signatures. Use to discover available PyRosetta classes or get constructor details. Requires local installation.',
+                                inputSchema: { type: 'object', properties: { query: { type: 'string', description: 'Substring to match class names' }, kind: { type: 'string', description: 'Filter by kind: mover|filter|selector|task' }, max_results: { type: 'number', description: 'Max number of results (default 50)' } } },
+                                annotations: { readOnlyHint: true, openWorldHint: false }
+                            },
+                            {
+                                name: 'rosetta_scripts_schema',
+                                description: 'Generate and cache the RosettaScripts XML schema (XSD). Optionally extract element names. Use to get the authoritative list of valid XML elements. Requires local installation.',
+                                inputSchema: { type: 'object', properties: { exe_path: { type: 'string', description: 'Path to rosetta_scripts executable (optional)' }, cache_dir: { type: 'string', description: 'Directory to store schema' }, extract_elements: { type: 'boolean', description: 'If true, return a list of element names' } } },
+                                annotations: { readOnlyHint: false, openWorldHint: false }
+                            },
+                            {
+                                name: 'get_cached_docs',
+                                description: 'Search locally cached Rosetta CLI docs for a keyword. Auto-caches on first use. Use to look up command-line flags or parser info. Requires local installation.',
+                                inputSchema: { type: 'object', properties: { cache_dir: { type: 'string', description: 'Directory where docs are cached' }, query: { type: 'string', description: 'Search string' }, max_lines: { type: 'number', description: 'Max number of lines to return (default 200)' } } },
+                                annotations: { readOnlyHint: true, openWorldHint: false }
+                            },
+                            {
+                                name: 'python_env_info',
+                                description: 'Get Python executable path, version, and pip package list. Use to diagnose environment issues or verify package installations. Requires local installation.',
+                                inputSchema: { type: 'object', properties: {} },
+                                annotations: { readOnlyHint: true, openWorldHint: false }
+                            },
+                            {
+                                name: 'check_pyrosetta',
+                                description: 'Check if PyRosetta is importable in the current environment. Use before PyRosetta-dependent tools to verify availability. Requires local installation.',
+                                inputSchema: { type: 'object', properties: {} },
+                                annotations: { readOnlyHint: true, openWorldHint: false }
+                            },
+                            {
+                                name: 'install_pyrosetta_installer',
+                                description: 'Install PyRosetta using the pyrosetta-installer package. Takes 10-30 minutes. Use when PyRosetta is not available and needed for scoring or design. Requires local installation.',
+                                inputSchema: { type: 'object', properties: { silent: { type: 'boolean' } } },
+                                annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: true }
+                            },
+                            {
+                                name: 'find_rosetta_scripts',
+                                description: 'Resolve the rosetta_scripts executable path by checking exe_path, ROSETTA_BIN env, common directories, and PATH. Use to verify Rosetta is installed. Requires local installation.',
+                                inputSchema: { type: 'object', properties: { exe_path: { type: 'string' } } },
+                                annotations: { readOnlyHint: true, openWorldHint: false }
                             }
                     ];
                     // Always expose all tools
@@ -2468,6 +2386,21 @@ class RosettaMCPServerMCP {
                                 input_format: args.input_format,
                                 include_comments: args.include_comments
                             });
+                            break;
+                        case 'get_local_setup':
+                            result = {
+                                message: 'For scoring, structure optimization, introspection, and running RosettaScripts protocols, install the full Rosetta MCP server locally.',
+                                install_steps: [
+                                    '1. npm install -g rosetta-mcp-server',
+                                    '2. Set up Python env: pip install pyrosetta-installer biotite && python -c "import pyrosetta_installer as I; I.install_pyrosetta()"',
+                                    '3. Add to your MCP client config (e.g., ~/.cursor/mcp.json):',
+                                    '   { "mcpServers": { "rosetta": { "command": "rosetta-mcp-server", "env": { "PYTHON_BIN": "/path/to/your/python" } } } }',
+                                    '4. Restart your editor'
+                                ],
+                                local_only_tools: ['pyrosetta_score', 'pyrosetta_introspect', 'run_rosetta_scripts', 'rosetta_scripts_schema', 'check_pyrosetta', 'install_pyrosetta_installer', 'find_rosetta_scripts', 'get_cached_docs', 'python_env_info'],
+                                npm_package: 'rosetta-mcp-server',
+                                docs: 'https://github.com/Arielbs/rosetta-mcp-server'
+                            };
                             break;
                         default:
                             throw new Error(`Unknown tool: ${name}`);
