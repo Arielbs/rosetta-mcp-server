@@ -306,24 +306,69 @@ const server = http.createServer(async (req, res) => {
     if (url === '/' && req.method === 'GET') {
         res.writeHead(200, { 'Content-Type': 'text/html' });
         res.end(`<!DOCTYPE html>
-<html><head><title>Rosetta MCP Server | molCore</title>
+<html><head><title>Rosetta MCP Server | Ariel J. Ben-Sasson</title>
 <style>body{font-family:'Inter',-apple-system,BlinkMacSystemFont,sans-serif;max-width:700px;margin:0 auto;padding:60px 20px;color:#2D2A26;line-height:1.6;background-color:#FAF6F1;min-height:100vh}
-body::before{content:'';position:fixed;top:0;left:0;width:100%;height:100%;pointer-events:none;opacity:0.15;background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.4'/%3E%3C/svg%3E")}
+body::before{content:'';position:fixed;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:9999;opacity:0.22;background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.7' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E")}
 h1{color:#2D2A26}h2{color:#6B6560}a{color:#B8895A}a:hover{color:#A07848}code{background:rgba(232,213,196,0.4);padding:2px 6px;border-radius:4px;font-size:0.9em;color:#2D2A26}
 .tools{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:16px 0}.tool{background:linear-gradient(145deg,rgba(240,235,227,0.85),rgba(250,246,241,0.9),rgba(232,213,196,0.7));padding:8px 12px;border-radius:6px;font-size:0.9em;border:1px solid rgba(212,165,116,0.2)}
-.badge{display:inline-block;background:linear-gradient(135deg,#B8895A,#C9A06C);color:white;padding:2px 8px;border-radius:12px;font-size:0.8em}</style></head>
+.tool.bridge{background:linear-gradient(145deg,rgba(212,165,116,0.25),rgba(232,213,196,0.4));border:1px dashed #B8895A}
+.badge{display:inline-block;background:linear-gradient(135deg,#B8895A,#C9A06C);color:white;padding:2px 8px;border-radius:12px;font-size:0.8em}
+.local-section{position:relative;margin:32px 0}
+.local-header{display:flex;align-items:center;gap:12px;margin-bottom:12px}
+.local-label{background:rgba(212,165,116,0.15);border:1px solid rgba(212,165,116,0.3);padding:4px 12px;border-radius:6px;font-size:0.85em;color:#6B6560}
+.local-tools{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px}.local-tool{background:rgba(240,235,227,0.5);padding:6px 10px;border-radius:5px;font-size:0.8em;color:#6B6560;border:1px dashed rgba(212,165,116,0.25)}
+.arrow-wrapper{position:relative;width:100%;height:90px;margin:-4px 0 -20px 0}
+.arrow-wrapper svg{width:100%;height:100%}
+.byline{font-size:0.95em;color:#6B6560;margin-top:-4px}</style></head>
 <body>
 <h1>Rosetta MCP Server <span class="badge">v${serverVersion}</span></h1>
-<p>Give your AI coding agent expert-level knowledge of protein modeling and design.</p>
-<p>This is a <a href="https://modelcontextprotocol.io">Model Context Protocol</a> server by <a href="https://www.molcore.bio">molCore</a>. It provides ${REMOTE_TOOLS.size} remote tools for Rosetta, PyRosetta, and Biotite.</p>
+<p class="byline">by <strong>Ariel J. Ben-Sasson</strong> (<a href="https://www.molcore.bio">molCore</a>) &mdash; for the RosettaCommons community &amp; any bio-engineers out there</p>
+<p>Give your AI coding agent expert-level knowledge of protein modeling and design. Ask naive questions, get working code, translate and validate across Rosetta, PyRosetta, and Biotite.</p>
+<p>This is a <a href="https://modelcontextprotocol.io">Model Context Protocol</a> server providing ${REMOTE_TOOLS.size} remote tools and 9 additional local tools.</p>
 
 <h2>Connect your AI agent</h2>
-<p><strong>Claude.ai:</strong> Settings → Connectors → Add → <code>https://mcp.molcore.bio/mcp</code></p>
-<p><strong>Full local install</strong> (with scoring & protocols): <code>npm install -g rosetta-mcp-server</code></p>
+<p><strong>Claude.ai:</strong> Settings &rarr; Connectors &rarr; Add &rarr; <code>https://mcp.molcore.bio/mcp</code></p>
+<p><strong>Full local install</strong> (with scoring &amp; protocols): <code>npm install -g rosetta-mcp-server</code></p>
 
-<h2>Available tools</h2>
+<h2>Available remotely</h2>
 <div class="tools">
-${Array.from(REMOTE_TOOLS).map(t => `<div class="tool"><strong>${t}</strong></div>`).join('\n')}
+<div class="tool"><strong>get_rosetta_info</strong></div>
+<div class="tool"><strong>get_rosetta_help</strong></div>
+<div class="tool"><strong>validate_xml</strong></div>
+<div class="tool"><strong>xml_to_pyrosetta</strong></div>
+<div class="tool"><strong>rosetta_to_biotite</strong></div>
+<div class="tool"><strong>biotite_to_rosetta</strong></div>
+<div class="tool"><strong>translate_rosetta_script_to_biotite</strong></div>
+<div class="tool"><strong>search_rosetta_web_docs</strong></div>
+<div class="tool"><strong>get_rosetta_web_doc</strong></div>
+<div class="tool bridge"><strong>get_local_setup</strong></div>
+</div>
+
+<div class="arrow-wrapper">
+<svg viewBox="0 0 700 90" fill="none" xmlns="http://www.w3.org/2000/svg">
+<path d="M 530 2 C 520 20, 400 35, 250 38 S 100 42, 75 55 C 65 62, 60 70, 58 82" stroke="#B8895A" stroke-width="2" stroke-dasharray="5 4" fill="none" stroke-linecap="round"/>
+<path d="M 52 75 L 58 86 L 64 75" stroke="#B8895A" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="280" y="30" font-family="Inter,sans-serif" font-size="11" fill="#6B6560" font-style="italic" text-anchor="middle">sets up locally</text>
+</svg>
+</div>
+
+<div class="local-section">
+<div class="local-header">
+<h2 style="margin:0">Requires local install</h2>
+<span class="local-label">npm install -g rosetta-mcp-server</span>
+</div>
+<p style="font-size:0.9em;color:#6B6560;margin:4px 0 12px">These tools need PyRosetta or the Rosetta binary on your machine.</p>
+<div class="local-tools">
+<div class="local-tool">pyrosetta_score</div>
+<div class="local-tool">pyrosetta_introspect</div>
+<div class="local-tool">run_rosetta_scripts</div>
+<div class="local-tool">rosetta_scripts_schema</div>
+<div class="local-tool">check_pyrosetta</div>
+<div class="local-tool">install_pyrosetta_installer</div>
+<div class="local-tool">find_rosetta_scripts</div>
+<div class="local-tool">get_cached_docs</div>
+<div class="local-tool">python_env_info</div>
+</div>
 </div>
 
 <h2>Links</h2>
