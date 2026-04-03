@@ -307,10 +307,11 @@ const server = http.createServer(async (req, res) => {
         res.writeHead(200, { 'Content-Type': 'text/html' });
         res.end(`<!DOCTYPE html>
 <html><head><title>Rosetta MCP Server | molCore</title>
-<style>body{font-family:system-ui,sans-serif;max-width:700px;margin:60px auto;padding:0 20px;color:#333;line-height:1.6}
-h1{color:#1a1a2e}a{color:#2563eb}code{background:#f1f5f9;padding:2px 6px;border-radius:4px;font-size:0.9em}
-.tools{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:16px 0}.tool{background:#f8fafc;padding:8px 12px;border-radius:6px;font-size:0.9em}
-.badge{display:inline-block;background:#22c55e;color:white;padding:2px 8px;border-radius:12px;font-size:0.8em}</style></head>
+<style>body{font-family:'Inter',-apple-system,BlinkMacSystemFont,sans-serif;max-width:700px;margin:0 auto;padding:60px 20px;color:#2D2A26;line-height:1.6;background-color:#FAF6F1;min-height:100vh}
+body::before{content:'';position:fixed;top:0;left:0;width:100%;height:100%;pointer-events:none;opacity:0.15;background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.4'/%3E%3C/svg%3E")}
+h1{color:#2D2A26}h2{color:#6B6560}a{color:#B8895A}a:hover{color:#A07848}code{background:rgba(232,213,196,0.4);padding:2px 6px;border-radius:4px;font-size:0.9em;color:#2D2A26}
+.tools{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:16px 0}.tool{background:linear-gradient(145deg,rgba(240,235,227,0.85),rgba(250,246,241,0.9),rgba(232,213,196,0.7));padding:8px 12px;border-radius:6px;font-size:0.9em;border:1px solid rgba(212,165,116,0.2)}
+.badge{display:inline-block;background:linear-gradient(135deg,#B8895A,#C9A06C);color:white;padding:2px 8px;border-radius:12px;font-size:0.8em}</style></head>
 <body>
 <h1>Rosetta MCP Server <span class="badge">v${serverVersion}</span></h1>
 <p>Give your AI coding agent expert-level knowledge of protein modeling and design.</p>
