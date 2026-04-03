@@ -57,13 +57,16 @@ try {
 // Build the server card for /.well-known/mcp/server-card.json
 function getServerCard() {
     return {
-        serverInfo: { name: 'rosetta-mcp-server', version: serverVersion },
+        serverInfo: {
+            name: 'rosetta-mcp-server',
+            version: serverVersion,
+            displayName: 'Rosetta MCP Server',
+            description: 'Expert-level protein modeling tools for Rosetta, PyRosetta, and Biotite. Help, validation, translation, and documentation search.',
+            homepage: 'https://mcp.molcore.bio',
+            icon: 'https://mcp.molcore.bio/favicon.svg'
+        },
         authentication: { required: false },
-        tools: Array.from(REMOTE_TOOLS).map(name => ({
-            name,
-            description: `Rosetta MCP tool: ${name}`,
-            inputSchema: { type: 'object' }
-        })),
+        tools: getRemoteToolDefs(),
         resources: [],
         prompts: []
     };
@@ -83,7 +86,14 @@ async function handleMCPRequest(message) {
                 result: {
                     protocolVersion: requestedProtocol,
                     capabilities: { tools: { list: true, call: true } },
-                    serverInfo: { name: 'rosetta-mcp-server', version: serverVersion }
+                    serverInfo: {
+                        name: 'rosetta-mcp-server',
+                        version: serverVersion,
+                        displayName: 'Rosetta MCP Server',
+                        description: 'Expert-level protein modeling tools for Rosetta, PyRosetta, and Biotite',
+                        homepage: 'https://mcp.molcore.bio',
+                        icon: 'https://mcp.molcore.bio/favicon.svg'
+                    }
                 }
             };
         }
@@ -234,6 +244,14 @@ const server = http.createServer(async (req, res) => {
         const body = JSON.stringify({ status: 'ok', version: serverVersion, tools: REMOTE_TOOLS.size });
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(body);
+        return;
+    }
+
+    // Favicon (simple protein helix icon in SVG)
+    if ((url === '/favicon.svg' || url === '/favicon.ico') && req.method === 'GET') {
+        const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect width="64" height="64" rx="12" fill="#FAF6F1"/><path d="M20 48 C20 48 22 20 32 16 C42 12 44 44 32 48 C20 52 22 24 32 20 C42 16 44 48 32 48" stroke="#B8895A" stroke-width="3" fill="none" stroke-linecap="round"/><circle cx="32" cy="16" r="3" fill="#B8895A"/><circle cx="32" cy="48" r="3" fill="#B8895A"/><circle cx="24" cy="32" r="2.5" fill="#D4A574"/><circle cx="40" cy="32" r="2.5" fill="#D4A574"/></svg>`;
+        res.writeHead(200, { 'Content-Type': 'image/svg+xml', 'Cache-Control': 'public, max-age=86400' });
+        res.end(svg);
         return;
     }
 
