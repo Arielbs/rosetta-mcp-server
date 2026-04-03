@@ -1,7 +1,8 @@
 {
   "name": "rosetta-mcp-server",
-  "version": "1.3.0",
+  "version": "1.3.1",
   "description": "MCP server for Rosetta/PyRosetta functions and properties",
+  "mcpName": "io.github.Arielbs/rosetta-mcp-server",
   "main": "rosetta_mcp_wrapper.js",
   "bin": {
     "rosetta-mcp-server": "./rosetta_mcp_wrapper.js",

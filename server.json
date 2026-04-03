@@ -1,0 +1,43 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.Arielbs/rosetta-mcp-server",
+  "description": "Rosetta/PyRosetta protein modeling and Biotite translation for computational biology",
+  "repository": {
+    "url": "https://github.com/Arielbs/rosetta-mcp-server",
+    "source": "github"
+  },
+  "version": "1.3.1",
+  "packages": [
+    {
+      "registryType": "npm",
+      "identifier": "rosetta-mcp-server",
+      "version": "1.3.1",
+      "transport": {
+        "type": "stdio"
+      },
+      "environmentVariables": [
+        {
+          "description": "Path to rosetta_scripts binary or its directory",
+          "isRequired": false,
+          "format": "string",
+          "isSecret": false,
+          "name": "ROSETTA_BIN"
+        },
+        {
+          "description": "Python interpreter with PyRosetta/Biotite installed",
+          "isRequired": false,
+          "format": "string",
+          "isSecret": false,
+          "name": "PYTHON_BIN"
+        },
+        {
+          "description": "Set to 1 for debug logging",
+          "isRequired": false,
+          "format": "string",
+          "isSecret": false,
+          "name": "MCP_DEBUG"
+        }
+      ]
+    }
+  ]
+}
