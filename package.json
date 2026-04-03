@@ -1,6 +1,6 @@
 {
   "name": "rosetta-mcp-server",
-  "version": "1.1.8",
+  "version": "1.3.0",
   "description": "MCP server for Rosetta/PyRosetta functions and properties",
   "main": "rosetta_mcp_wrapper.js",
   "bin": {
@@ -22,7 +22,8 @@
     "modeling",
     "bioinformatics",
     "mcp-server",
-    "model-context-protocol"
+    "model-context-protocol",
+    "biotite"
   ],
   "author": "Ariel Ben-Sasson",
   "license": "MIT",
@@ -32,12 +33,12 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/yourusername/rosetta-mcp-server.git"
+    "url": "git+https://github.com/Arielbs/rosetta-mcp-server.git"
   },
   "bugs": {
-    "url": "https://github.com/yourusername/rosetta-mcp-server/issues"
+    "url": "https://github.com/Arielbs/rosetta-mcp-server/issues"
   },
-  "homepage": "https://github.com/yourusername/rosetta-mcp-server#readme",
+  "homepage": "https://github.com/Arielbs/rosetta-mcp-server#readme",
   "files": [
     "rosetta_mcp_wrapper.js",
     "rosetta_mcp_server.py",

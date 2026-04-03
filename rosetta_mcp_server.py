@@ -25,7 +25,6 @@ class RosettaMCPServer:
     def _find_rosetta_path(self) -> str:
         """Find Rosetta installation path"""
         possible_paths = [
-            "/Users/arielben-sasson/dev/open_repos/rosetta",
             "/opt/rosetta",
             "/usr/local/rosetta",
             os.path.expanduser("~/rosetta")
