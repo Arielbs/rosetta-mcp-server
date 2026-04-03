@@ -302,6 +302,40 @@ const server = http.createServer(async (req, res) => {
         return;
     }
 
+    // Landing page for browser visitors
+    if (url === '/' && req.method === 'GET') {
+        res.writeHead(200, { 'Content-Type': 'text/html' });
+        res.end(`<!DOCTYPE html>
+<html><head><title>Rosetta MCP Server | molCore</title>
+<style>body{font-family:system-ui,sans-serif;max-width:700px;margin:60px auto;padding:0 20px;color:#333;line-height:1.6}
+h1{color:#1a1a2e}a{color:#2563eb}code{background:#f1f5f9;padding:2px 6px;border-radius:4px;font-size:0.9em}
+.tools{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:16px 0}.tool{background:#f8fafc;padding:8px 12px;border-radius:6px;font-size:0.9em}
+.badge{display:inline-block;background:#22c55e;color:white;padding:2px 8px;border-radius:12px;font-size:0.8em}</style></head>
+<body>
+<h1>Rosetta MCP Server <span class="badge">v${serverVersion}</span></h1>
+<p>Give your AI coding agent expert-level knowledge of protein modeling and design.</p>
+<p>This is a <a href="https://modelcontextprotocol.io">Model Context Protocol</a> server by <a href="https://www.molcore.bio">molCore</a>. It provides ${REMOTE_TOOLS.size} remote tools for Rosetta, PyRosetta, and Biotite.</p>
+
+<h2>Connect your AI agent</h2>
+<p><strong>Claude.ai:</strong> Settings → Connectors → Add → <code>https://mcp.molcore.bio/mcp</code></p>
+<p><strong>Full local install</strong> (with scoring & protocols): <code>npm install -g rosetta-mcp-server</code></p>
+
+<h2>Available tools</h2>
+<div class="tools">
+${Array.from(REMOTE_TOOLS).map(t => `<div class="tool"><strong>${t}</strong></div>`).join('\n')}
+</div>
+
+<h2>Links</h2>
+<ul>
+<li><a href="https://github.com/Arielbs/rosetta-mcp-server">GitHub</a></li>
+<li><a href="https://www.npmjs.com/package/rosetta-mcp-server">npm package</a></li>
+<li><a href="/health">Server status</a></li>
+<li><a href="https://www.molcore.bio">molCore</a></li>
+</ul>
+</body></html>`);
+        return;
+    }
+
     // Unknown path
     res.writeHead(404, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ error: 'Not found. Use POST /mcp for MCP requests, GET /health for status.' }));
