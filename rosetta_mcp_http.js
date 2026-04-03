@@ -255,6 +255,52 @@ const server = http.createServer(async (req, res) => {
         return;
     }
 
+    // Privacy policy
+    if (url === '/privacy' && req.method === 'GET') {
+        res.writeHead(200, { 'Content-Type': 'text/html' });
+        res.end(`<!DOCTYPE html>
+<html><head><title>Privacy Policy | Rosetta MCP Server</title>
+<style>body{font-family:'Inter',-apple-system,sans-serif;max-width:700px;margin:0 auto;padding:60px 20px;color:#2D2A26;line-height:1.8;background:#FAF6F1}h1{color:#2D2A26}h2{color:#6B6560;margin-top:2em}a{color:#B8895A}</style></head>
+<body>
+<h1>Privacy Policy</h1>
+<p><strong>Rosetta MCP Server</strong> by Ariel J. Ben-Sasson (<a href="https://www.molcore.bio">molCore</a>)<br>
+Effective date: April 2026</p>
+
+<h2>What we collect</h2>
+<p>This MCP server logs the following for rate limiting and operational monitoring:</p>
+<ul>
+<li><strong>IP address</strong> (for rate limiting, not stored persistently)</li>
+<li><strong>Tool name called</strong> (e.g., "rosetta_to_biotite")</li>
+<li><strong>Timestamp and response time</strong></li>
+</ul>
+<p>These logs are written to server stderr and are not stored in any database or shared with third parties.</p>
+
+<h2>What we do NOT collect</h2>
+<ul>
+<li>No user accounts, names, or emails</li>
+<li>No authentication tokens or credentials</li>
+<li>No PDB files, protein sequences, or scientific data</li>
+<li>No conversation content between you and your AI assistant</li>
+<li>No cookies or browser tracking</li>
+</ul>
+
+<h2>Data processing</h2>
+<p>Tool inputs (XML content, search queries, Rosetta method names) are processed in memory to generate responses and are not stored after the request completes.</p>
+
+<h2>Third-party services</h2>
+<p>The <code>search_rosetta_web_docs</code> and <code>get_rosetta_web_doc</code> tools make HTTP requests to <a href="https://www.rosettacommons.org">rosettacommons.org</a> and <a href="https://duckduckgo.com">DuckDuckGo</a> to fetch documentation. These requests are made server-side; your IP is not exposed to these services.</p>
+
+<h2>Hosting</h2>
+<p>This server is hosted on <a href="https://railway.app">Railway</a> (Portland, OR, USA). See <a href="https://railway.app/legal/privacy">Railway's privacy policy</a>.</p>
+
+<h2>Contact</h2>
+<p>For questions about this privacy policy, contact: <a href="https://www.molcore.bio">molCore</a></p>
+
+<p><a href="/">&larr; Back to Rosetta MCP Server</a></p>
+</body></html>`);
+        return;
+    }
+
     // Server card for Smithery
     if (url === '/.well-known/mcp/server-card.json' && req.method === 'GET') {
         const body = JSON.stringify(getServerCard(), null, 2);
