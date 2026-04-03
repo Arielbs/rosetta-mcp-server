@@ -1,0 +1,25 @@
+startCommand:
+  type: stdio
+  configSchema:
+    type: object
+    properties:
+      ROSETTA_BIN:
+        type: string
+        description: "Path to rosetta_scripts binary or its directory"
+      PYTHON_BIN:
+        type: string
+        description: "Python interpreter with PyRosetta/Biotite installed"
+      MCP_DEBUG:
+        type: string
+        description: "Set to 1 for debug logging"
+  commandFunction:
+    |-
+    (config) => ({
+      command: 'node',
+      args: ['rosetta_mcp_wrapper.js'],
+      env: {
+        ROSETTA_BIN: config.ROSETTA_BIN || '',
+        PYTHON_BIN: config.PYTHON_BIN || 'python3',
+        MCP_DEBUG: config.MCP_DEBUG || ''
+      }
+    })
