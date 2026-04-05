@@ -1,10 +1,25 @@
 # Rosetta Context Agent: Project Specification
 
 **Codename:** `rosetta-context-agent`
+**Repository:** `Arielbs/rosetta-sage`
 **Author:** Ariel J. Ben-Sasson (molCore)
 **Date:** April 2026
 **Status:** Specification (pre-development)
 **Relationship:** Separate product from `rosetta-mcp-server` (which becomes one tool this agent can call)
+
+## 0. Data Licensing & Permissions
+
+| Data Source | License/Status | Permission Needed? |
+|---|---|---|
+| RosettaCommons Forum (public archive) | Public Q&A | No |
+| GitHub Issues/Discussions (all repos) | Public on GitHub | No |
+| RosettaCommons Docs | Published documentation | No |
+| PyRosetta FAQ | Published on pyrosetta.org | No |
+| BioStars, ResearchGate | Public Q&A | No |
+| rosetta-devel email list | Members-only, internal | **Yes -- need RosettaCommons approval** |
+| Rosetta source code | Licensed (academic/commercial) | Depends on use |
+
+**Strategy:** Build and ship on public data only (~7,500 Q&As). Approach RosettaCommons leadership (ideally at RosettaCon 2026, Aug 3-7) about partnership to incorporate internal data as a future upgrade.
 
 ---
 
